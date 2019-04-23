@@ -11,7 +11,7 @@
 
 ## About The Project
 
-This project was created to work as a broker for Backtrader trading framework. It uses ZeroMQ sockets to communicate. Python side of this project located here: [Python Backtrader - Metaquotes MQL5 ](https://github.com/khramkov/MQL5-Backtrader-API)
+This is Backtrader part of the project. MQL5 side of this project located here: [Metaquotes MQL5 - Python Backtrader - API](https://github.com/khramkov/MQL5-Backtrader-API).
 
 Working:
 * Account info
@@ -29,7 +29,10 @@ Not working:
 * Change timeframe and instrument symdol
 
 ## Installation and usage
-```
+1. Install PyZMQ - 'pip install pyzmq'
+2. Strategy example:
+
+```python
 from metatrader import MT5Store
 import backtrader as bt
 from datetime import datetime, timedelta
