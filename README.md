@@ -2,8 +2,7 @@
 
 ### Development state: Alfa (Code not stable yet, documentation in development)
 
-[Report Bug](https://github.com/khramkov/Backtrader-MQL5-API/issues) or [Request Feature](https://github.com/khramkov/Backtrader-MQL5-API
-/issues)
+[Report Bug](https://github.com/khramkov/Backtrader-MQL5-API/issues) or [Request Feature](https://github.com/khramkov/Backtrader-MQL5-API/issues)
 
 ## Table of Contents
 * [About the Project](#about-the-project)
@@ -30,9 +29,8 @@ Not working:
 * Change timeframe and instrument symdol
 
 ## Installation and usage
-
-'''
-from exchanges import MT5Store
+```
+from metatrader import MT5Store
 import backtrader as bt
 from datetime import datetime, timedelta
 
@@ -85,7 +83,7 @@ data = store.getdata(dataname='EURUSD', name='EURUSD',
 
 cerebro.adddata(data)
 cerebro.run()
-'''
+```
 
 
 ## License
