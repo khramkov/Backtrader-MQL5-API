@@ -11,7 +11,7 @@
 
 ## About the Project
 
-This is Backtrader part of the project. MQL5 side of this project located here: [Metaquotes MQL5 - Python Backtrader - API.](https://github.com/khramkov/MQL5-JSON-API)
+This is Backtrader part of the project. MQL5 side of this project is located here: [Metaquotes MQL5 - Python Backtrader - API.](https://github.com/khramkov/MQL5-JSON-API)
 
 Only Market orders are working!!!
 
