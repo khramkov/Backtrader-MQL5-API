@@ -6,7 +6,7 @@ import collections
 from datetime import datetime
 import threading
 
-from exchanges.adapter import PositionAdapter, OrderAdapter, BalanceAdapter
+from mt5.adapter import PositionAdapter, OrderAdapter, BalanceAdapter
 
 import backtrader as bt
 from backtrader.metabase import MetaParams
