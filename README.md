@@ -42,14 +42,8 @@ from datetime import datetime, timedelta
 
 
 class SmaCross(bt.SignalStrategy):
-    params = (
 
-        ('take_profit', 0.04),
-        ('stop_loss', 0.01),
-
-    )
     def __init__(self):
-
         self.buy_order = None
         self.live_data = False
 
@@ -58,7 +52,6 @@ class SmaCross(bt.SignalStrategy):
             self.buy_order = self.buy(size=0.1, exectype=bt.Order.Market)
             # self.buy_order = self.buy_bracket(limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market)
             # pass
-
 
         if self.live_data:
             cash = self.broker.getcash()
@@ -90,6 +83,7 @@ cerebro.addstrategy(SmaCross)
 
 store = MTraderStore()
 
+# comment next 2 lines to use backbroker for backtesting with MTraderStore
 broker = store.getbroker(use_positions=True)
 cerebro.setbroker(broker)
 
