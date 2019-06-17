@@ -432,8 +432,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 self.broker._reject(oref)
                 return
 
-            # if self.debug:
-            #     print(o)
+            if self.debug:
+                print(o)
 
             if o['error']:
                 self.put_notification(o['desription'])
@@ -484,11 +484,15 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if self.debug:
             print('Fetching: {}, Timeframe: {}, Fromdate: {}'.format(dataname, tf, dtbegin))
 
-        candles = self.oapi.construct_and_send(action="HISTORY", actionType="DATA", symbol=dataname,
+        data = self.oapi.construct_and_send(action="HISTORY", actionType="DATA", symbol=dataname,
                                                chartTF=tf, fromDate=begin, toDate=end)
+        candles = data['data']
         # Remove last unclosed candle
         if not include_first:
-            del candles[-1]
+            try:
+                del candles[-1]
+            except:
+                pass
 
         q = queue.Queue()
         for c in candles:

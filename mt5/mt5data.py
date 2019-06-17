@@ -24,8 +24,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     """MTrader Data Feed.
 
     TODO: implement tick data
-    TODO: implement backfill
-    TODO: implement todate
+    TODO: test backfill_from
 
     Params:
 
@@ -49,18 +48,6 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         backfilling from IB will take place. This is ideally meant to backfill
         from already stored sources like a file on disk, but not limited to.
 
-      - `bidask` (default: `True`)
-
-        If `True`, then the historical/backfilling requests will request
-        bid/ask prices from the server
-
-        If `False`, then *midpoint* will be requested
-
-      - `useask` (default: `False`)
-
-        If `True` the *ask* part of the *bidask* prices will be used instead
-        of the default use of *bid*
-
       - `include_last` (default: `False`)
 
         Last historical candle is not closed. It will be updated in live stream
@@ -74,8 +61,6 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         ('historical', False),   # do backfilling at the start
         ('backfill', True),      # do backfilling when reconnecting
         ('backfill_from', None), # additional data source to do backfill from
-        ('bidask', True),
-        ('useask', False),
         ('include_last', False),
         ('reconnect', True),
     )
@@ -92,7 +77,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
-        self._candleFormat = 'bidask' if self.p.bidask else 'midpoint'
+        # self._candleFormat = 'bidask' if self.p.bidask else 'midpoint'
 
     def setenvironment(self, env):
         """Receives an environment (cerebro) and passes it over to the store it
@@ -107,7 +92,6 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
         # Create attributes as soon as possible
         self._statelivereconn = False  # if reconnecting in live state
-        self._storedmsg = dict()  # keep pending live message (under None)
         self.qlive = self.o.q_livedata
         self._state = self._ST_OVER
 
@@ -135,35 +119,18 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
             self._state = self._ST_START
             self._st_start()
 
-    def _st_start(self, instart=True, tmout=None):
-        if self.p.historical:
-            self.put_notification(self.DELAYED)
+    def _st_start(self):
+        self.put_notification(self.DELAYED)
 
-            date_begin = num2date(self.fromdate) if self.fromdate > float('-inf') else None
-            date_end = num2date(self.todate) if self.todate < float('inf') else None
+        date_begin = num2date(self.fromdate) if self.fromdate > float('-inf') else None
+        date_end = num2date(self.todate) if self.todate < float('inf') else None
 
-            self.qhist = self.o.candles(self.p.dataname, date_begin, date_end, self._timeframe,
-                                        self._compression, self.p.include_last)
+        self.qhist = self.o.candles(self.p.dataname, date_begin, date_end, self._timeframe,
+                                    self._compression, self.p.include_last)
 
-            self._state = self._ST_HISTORBACK
-            return True
+        self._state = self._ST_HISTORBACK
 
-        if instart:
-            date_begin = num2date(self.fromdate) if self.fromdate > float('-inf') else None
-            date_end = num2date(self.todate) if self.todate < float('inf') else None
-
-            self.qhist = self.o.candles(self.p.dataname, date_begin, date_end, self._timeframe,
-                                        self._compression, self.p.include_last)
-
-            self._state = self._ST_HISTORBACK
-            self._statelivereconn = self.p.backfill
-
-        if self._statelivereconn:
-            self.put_notification(self.DELAYED)
-
-        # self._state = self._ST_LIVE
-
-        return True  # no return before - implicit continue
+        return True
 
     def stop(self):
         '''Stops and tells the store to stop'''
@@ -171,7 +138,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.o.stop()
 
     def haslivedata(self):
-        return bool(self._storedmsg or self.qlive)  # do not return the objs
+        return bool(self.qlive)  # do not return the obj
 
     def _load(self):
         if self._state == self._ST_OVER:
@@ -180,18 +147,32 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         while True:
             if self._state == self._ST_LIVE:
                 try:
-                    msg = (self._storedmsg.pop(None, None) or
-                           self.qlive.get())
+                    msg = self.qlive.get()
                 except queue.Empty:
                     return None
 
                 if msg:
-                    if self._load_history(msg):
-                        return True  # loading worked
+                    if msg['status'] == 'DISCONNECTED':
+                        self.put_notification(self.DISCONNECTED)
 
-                # else do a backfill
-                if self._laststatus != self.DELAYED:
-                    self.put_notification(self.DELAYED)
+                        if not self.p.backfill:
+                            self._state = self._ST_OVER
+
+                        self._statelivereconn = True
+                        continue
+
+                    elif msg['status'] == 'CONNECTED' and self._statelivereconn:
+                        self.put_notification(self.CONNECTED)
+                        self._statelivereconn = False
+
+                        if len(self) > 1:
+                            self.fromdate = self.lines.datetime[-1]
+
+                        self._st_start()
+                        continue
+
+                    if self._load_history(msg['data']):
+                        return True  # loading worked
 
             elif self._state == self._ST_HISTORBACK:
                 msg = self.qhist.get()
@@ -234,7 +215,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                 return True
 
             elif self._state == self._ST_START:
-                if not self._st_start(instart=False):
+                if not self._st_start():
                     self._state = self._ST_OVER
                     return False
 
