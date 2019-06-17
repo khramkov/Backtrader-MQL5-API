@@ -11,7 +11,7 @@
 
 ## About the Project
 
-This is Backtrader part of the project. MQL5 side of this project is located here: [Metaquotes MQL5 - Python Backtrader - API.] (https://github.com/khramkov/MQL5-JSON-API)
+This is the Backtrader part of the project. MQL5 side of this project is located here: [MQL5 - JSON - API](https://github.com/khramkov/MQL5-JSON-API) 
 
 Only Market orders are working!!!
 
@@ -30,7 +30,7 @@ Tested on macOS Mojave / Windows 10 in Parallels Desktop container.
 
 ## Documentation
 
-See [Metaquotes MQL5 - Python Backtrader - API] (https://github.com/khramkov/MQL5-JSON-API) documentation for understanding the logic.
+See [MQL5 - JSON - API](https://github.com/khramkov/MQL5-JSON-API) documentation for understanding the logic.
 
 ## Usage
 
@@ -49,9 +49,7 @@ class SmaCross(bt.SignalStrategy):
 
     def next(self):
         if self.buy_order is None:
-            self.buy_order = self.buy(size=0.1, exectype=bt.Order.Market)
-            # self.buy_order = self.buy_bracket(limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market)
-            # pass
+            self.buy_order = self.buy_bracket(limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market)
 
         if self.live_data:
             cash = self.broker.getcash()
