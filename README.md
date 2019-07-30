@@ -13,24 +13,48 @@
 
 This is the Backtrader part of the project. MQL5 side of this project is located here: [MQL5 - JSON - API](https://github.com/khramkov/MQL5-JSON-API) 
 
-Only Market orders are working!!!
 
 In development:
 
-* Pending orders
-* Docs
 * Upload data on reconnect
 
 ## Installation
 
-1. `pip install pyzmq`
-2. Check if the ports are free to use. (default:`15555`,`15556`, `15557`,`15558`)
+1. `pip install backtrader`
+2. `pip install pyzmq`
+3. Check if the ports are free to use. (default:`15555`,`15556`, `15557`,`15558`)
 
 Tested on macOS Mojave / Windows 10 in Parallels Desktop container.
 
 ## Documentation
 
-See [MQL5 - JSON - API](https://github.com/khramkov/MQL5-JSON-API) documentation for understanding the logic.
+See [MQL5 - JSON - API documentation](https://github.com/khramkov/MQL5-JSON-API) for better understanding the logic.
+
+You can create market or pending order with the default `backtrader` command.
+
+``` python
+self.buy_order = self.buy(size=0.1, price=1.11, exectype=bt.Order.Limit)
+```
+
+If you want to cancel it.
+
+``` python
+self.cancel(self.buy_order)
+```
+
+
+When you use `bracket` orders, one order with stops will be created on the MQL5 side.
+
+``` python
+self.buy_order = self.buy_bracket(limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market)
+```
+
+If you want to cancel `bracket` orders, you shold cancel only the first one.
+
+``` python
+self.cancel(self.buy_order[0])
+```
+
 
 ## Usage
 
