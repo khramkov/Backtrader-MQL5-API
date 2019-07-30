@@ -170,7 +170,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     """
     Singleton class wrapping to control the connections to MetaTrader.
 
-    Account balance updates occur at the beginning and after each
+    Balance update occurs at the beginning and after each
     transaction registered by '_t_streaming_events'.
     """
 
@@ -235,7 +235,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         self._orders = collections.OrderedDict()  # map order.ref to oid
         self._ordersrev = collections.OrderedDict()  # map oid to order.ref
-        self._transpend = collections.defaultdict(collections.deque)
+        self._orders_type = dict()  # keeps order types
 
         self.oapi = MTraderAPI('localhost')
 
@@ -243,7 +243,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._value = 0.0
 
         self.q_livedata = queue.Queue()
-        self.trans_list = []
 
         self._cancel_flag = False
 
@@ -321,13 +320,11 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             pass
 
     def streaming_events(self):
-        for _ in range(3):
-            t = threading.Thread(target=self._t_livedata, daemon=True)
-            t.start()
+        t = threading.Thread(target=self._t_livedata, daemon=True)
+        t.start()
 
-        for _ in range(3):
-            t = threading.Thread(target=self._t_streaming_events, daemon=True)
-            t.start()
+        t = threading.Thread(target=self._t_streaming_events, daemon=True)
+        t.start()
 
     def _t_livedata(self):
         # create socket connection for the Thread
@@ -377,13 +374,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if order.exectype != bt.Order.Market:
             okwargs['price'] = format(order.created.price)
 
-        # TODO: implement expiration
         if order.valid is None:
             okwargs['expiration'] = 0  # good to cancel
         else:
-            okwargs['expiration'] = 'GTD'  # good to date
-            gtdtime = order.data.num2date(order.valid)
-            okwargs['gtdTime'] = gtdtime.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+            okwargs['expiration'] = order.valid  # good to date
 
         if order.exectype == bt.Order.StopLimit:
             okwargs['price'] = order.created.pricelimit
@@ -445,7 +439,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self._orders[oref] = oid
             self.broker._submit(oref)
 
-            self._ordersrev[oid] = oref  # maps ids to backtrader order
+            # keeps orders types
+            self._orders_type[oref] = okwargs['actionType']
+            # maps ids to backtrader order
+            self._ordersrev[oid] = oref
 
     def order_cancel(self, order):
         self.q_orderclose.put(order.ref)
@@ -458,17 +455,24 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 break
 
             oid = self._orders.get(oref, None)
-            order = self.broker.orders[oref]
-            symbol = order.data._dataname
             if oid is None:
                 continue  # the order is no longer there
+
+            # get symbol name
+            order = self.broker.orders[oref]
+            symbol = order.data._dataname
+            # get order type
+            order_type = self._orders_type.get(oref, None)
+
             try:
-                self.cancel_order(oid, symbol)
+                if order_type in ['ORDER_TYPE_BUY', 'ORDER_TYPE_SELL']:
+                    self.close_position(oid, symbol)
+                else:
+                    self.cancel_order(oid, symbol)
             except Exception as e:
-                self.put_notification(
-                    "Order not cancelled: {}, {}".format(
-                        oid, e))
+                self.put_notification("Order not cancelled: {}, {}".format(oid, e))
                 continue
+
             self._cancel_flag = True
             self.broker._cancel(oref)
 
@@ -524,8 +528,21 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         for key, value in conf.items():
             print(key, value, sep=' - ')
 
-    def cancel_order(self, oid, symbol):
+    def close_position(self, oid, symbol):
+        if self.debug:
+            print('Closing position: {}, on symbol: {}'.format(oid, symbol))
+
         conf = self.oapi.construct_and_send(action="TRADE", actionType='POSITION_CLOSE_ID', symbol=symbol, id=oid)
+        print(conf)
+        # Error handling
+        if conf["error"]:
+            raise ServerDataError(conf)
+
+    def cancel_order(self, oid, symbol):
+        if self.debug:
+            print('Cancelling order: {}, on symbol: {}'.format(oid, symbol))
+
+        conf = self.oapi.construct_and_send(action="TRADE", actionType='ORDER_CANCEL', symbol=symbol, id=oid)
         print(conf)
         # Error handling
         if conf["error"]:
@@ -543,14 +560,13 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         # self.get_balance()
 
         if self.debug:
-            print(request)
-            print(reply)
+            print(request, reply, sep='\n')
 
         if request['action'] == 'TRADE_ACTION_DEAL':
             # get order id (matches transaction id)
             oid = request['order']
         elif request['action'] == 'TRADE_ACTION_PENDING':
-            pass
+            oid = request['order']
 
         elif request['action'] == 'TRADE_ACTION_SLTP':
             pass
@@ -594,6 +610,9 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             oref = self._ordersrev[oid]
         except KeyError:
             return
+
+        if request['action'] == 'TRADE_ACTION_PENDING':
+            pass
 
         if reply['result'] == 'TRADE_RETCODE_DONE':
             size = float(reply['volume'])

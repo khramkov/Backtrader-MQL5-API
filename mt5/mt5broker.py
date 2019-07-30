@@ -38,13 +38,13 @@ class MTraderBroker(with_metaclass(MetaMTraderBroker, BrokerBase)):
 
     Params:
 
-      - `use_positions` (default:`True`): When connecting to the broker
+      - `use_positions` (default:`False`): When connecting to the broker
         provider use the existing positions to kickstart the broker.
 
         Set to `False` during instantiation to disregard any existing
         position
     """
-    # TODO: netting/hedge mode
+    # TODO: close positions
 
     params = (
         ('use_positions', True),
