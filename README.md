@@ -28,7 +28,7 @@ Tested on macOS Mojave / Windows 10 in Parallels Desktop container.
 
 ## Documentation
 
-See [MQL5 - JSON - API documentation](https://github.com/khramkov/MQL5-JSON-API) for better understanding the logic.
+See [MQL5 - JSON - API documentation](https://github.com/khramkov/MQL5-JSON-API) for better understanding.
 
 You can create market or pending order with the default `backtrader` command.
 
