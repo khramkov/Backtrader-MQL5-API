@@ -78,9 +78,9 @@ class SmaCross(bt.SignalStrategy):
         if self.live_data:
             cash = self.broker.getcash()
 				
-			# Cancel order 
-			# if self.buy_order is not None:
-			# 	self.cancel(self.buy_order[0])
+	# Cancel order 
+	if self.buy_order is not None:
+	   self.cancel(self.buy_order[0])
 
         else:
             # Avoid checking the balance during a backfill. Otherwise, it will
