@@ -1,6 +1,8 @@
 # Python Backtrader - Metaquotes MQL5 - API
 
-### Development state: stable beta (code is stable)
+### Development state: first stable release.
+
+Working in production on Debian 10.
 
 ## Table of Contents
 * [About the Project](#about-the-project)
@@ -23,8 +25,6 @@ In development:
 1. `pip install backtrader`
 2. `pip install pyzmq`
 3. Check if the ports are free to use. (default:`15555`,`15556`, `15557`,`15558`)
-
-Tested on macOS Mojave / Windows 10 in Parallels Desktop container.
 
 ## Documentation
 
@@ -78,9 +78,9 @@ class SmaCross(bt.SignalStrategy):
         if self.live_data:
             cash = self.broker.getcash()
 				
-	# Cancel order 
-	if self.buy_order is not None:
-	    self.cancel(self.buy_order[0])
+		 # Cancel order 
+		 if self.buy_order is not None:
+			  self.cancel(self.buy_order[0])
 
         else:
             # Avoid checking the balance during a backfill. Otherwise, it will
@@ -88,7 +88,7 @@ class SmaCross(bt.SignalStrategy):
             cash = 'NA'
 
         for data in self.datas:
-            print(f'{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]} SMA:{self.sma[0]}')
+            print(f'{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]}')
 
     def notify_data(self, data, status, *args, **kwargs):
         dn = data._name
@@ -121,5 +121,4 @@ cerebro.plot(style='candlestick', volume=False)
 
 ## License
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See `LICENSE` for more information.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See `LICENSE` for more information.
