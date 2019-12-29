@@ -224,7 +224,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         """Returns broker with *args, **kwargs from registered `BrokerCls`"""
         return cls.BrokerCls(*args, **kwargs)
 
-    def __init__(self):
+    def __init__(self, host='localhost'):
         super(MTraderStore, self).__init__()
 
         self.notifs = collections.deque()  # store notifications for cerebro
@@ -237,7 +237,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._ordersrev = collections.OrderedDict()  # map oid to order.ref
         self._orders_type = dict()  # keeps order types
 
-        self.oapi = MTraderAPI('localhost')
+        self.oapi = MTraderAPI(host)
 
         self._cash = 0.0
         self._value = 0.0
