@@ -5,9 +5,9 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="backtradermql5",
-    version="1.30",
+    version="1.31",
     author="Nikolai Khramkov",
-    author_email="khramkov@example.com",
+    # author_email="khramkov@example.com",
     description="Python Backtrader - Metaquotes MQL5 - API",
     long_description=long_description,
     long_description_content_type="text/markdown",
