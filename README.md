@@ -5,20 +5,20 @@
 Working in production on Debian 10.
 
 ## Table of Contents
-* [About the Project](#about-the-project)
-* [Installation](#installation)
-* [Documentation](#documentation)
-* [Usage](#usage)
-* [License](#license)
+
+- [About the Project](#about-the-project)
+- [Installation](#installation)
+- [Documentation](#documentation)
+- [Usage](#usage)
+- [License](#license)
 
 ## About the Project
 
-This is the Backtrader part of the project. MQL5 side of this project is located here: [MQL5 - JSON - API](https://github.com/khramkov/MQL5-JSON-API) 
-
+This is the Backtrader part of the project. MQL5 side of this project is located here: [MQL5 - JSON - API](https://github.com/khramkov/MQL5-JSON-API)
 
 In development:
 
-* Upload data on reconnect
+- Upload data on reconnect
 
 ## Installation
 
@@ -32,36 +32,33 @@ See [MQL5 - JSON - API documentation](https://github.com/khramkov/MQL5-JSON-API)
 
 You can create market or pending order with the default `backtrader` command.
 
-``` python
+```python
 self.buy_order = self.buy(size=0.1, price=1.11, exectype=bt.Order.Limit)
 ```
 
 If you want to cancel it.
 
-``` python
+```python
 self.cancel(self.buy_order)
 ```
 
-
 When you use `bracket` orders, one order with stops will be created on the MQL5 side.
 
-``` python
+```python
 self.buy_order = self.buy_bracket(limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market)
 ```
 
 If you want to cancel `bracket` orders, you shold cancel only the first one.
 
-``` python
+```python
 self.cancel(self.buy_order[0])
 ```
 
-
 ## Usage
 
- 
-``` python
+```python
 import backtrader as bt
-from mt5.mt5store import MTraderStore
+from backtradermt5.mt5store import MTraderStore
 from datetime import datetime, timedelta
 
 
@@ -77,8 +74,8 @@ class SmaCross(bt.SignalStrategy):
 
         if self.live_data:
             cash = self.broker.getcash()
-				
-		 # Cancel order 
+
+		 # Cancel order
 		 if self.buy_order is not None:
 			  self.cancel(self.buy_order[0])
 
@@ -120,5 +117,7 @@ cerebro.plot(style='candlestick', volume=False)
 ```
 
 ## License
+
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See `LICENSE` for more information.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See `LICENSE` for more information.
