@@ -49,7 +49,6 @@ class MTraderAPI:
     # TODO: unify error handling
 
     def __init__(self, *args, **kwargs):
-        print(kwargs)
         self.HOST = kwargs['host'] or 'localhost'
         self.SYS_PORT = 15555       # REP/REQ port
         self.DATA_PORT = 15556      # PUSH/PULL port
@@ -59,7 +58,7 @@ class MTraderAPI:
 
         # ZeroMQ timeout in seconds
         sys_timeout = 1
-        data_timeout = 10
+        data_timeout = 30
 
         # initialise ZMQ context
         context = zmq.Context()
@@ -194,6 +193,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
     # MTrader supported granularities
     _GRANULARITIES = {
+        (bt.TimeFrame.Ticks, 1): 'TICKS',
+        (bt.TimeFrame.Seconds, 10): 'SECONDS',
         (bt.TimeFrame.Minutes, 1): 'M1',
         (bt.TimeFrame.Minutes, 5): 'M5',
         (bt.TimeFrame.Minutes, 15): 'M15',
@@ -225,6 +226,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     @classmethod
     def getdata(cls, *args, **kwargs):
         """Returns `DataCls` with args, kwargs"""
+        params = {'timeframe': bt.TimeFrame.Days,
+                  'compression': 1}
+        params.update(kwargs)
+        cls.getdata_params = params
         return cls.DataCls(*args, **kwargs)
 
     @classmethod
@@ -341,7 +346,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             try:
                 last_candle = socket.recv_json()
                 if self.debug:
-                    print('ZMQ LIVE LAST_CANDLE: ', last_candle)
+                    print('ZMQ LIVE DATA: ', last_candle)
             except zmq.ZMQError:
                 raise zmq.NotDone("Live data ERROR")
 
@@ -491,7 +496,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self.broker._cancel(oref)
 
     def candles(self, dataname, dtbegin, dtend, timeframe, compression, include_first=False):
-        tf = self.get_granularity(timeframe, compression)
+        tf = self.get_granularity(
+            self.getdata_params['timeframe'], self.getdata_params['compression'])
 
         begin = end = None
         if dtbegin:
@@ -520,10 +526,12 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         q.put({})
         return q
 
-    def config_server(self, symbol: str, timeframe: str) -> None:
+    # def config_server(self, symbol: str, timeframe: str) -> None:
+    def config_server(self, symbol: str) -> None:
         """Set server terminal symbol and time frame"""
         conf = self.oapi.construct_and_send(
-            action="CONFIG", symbol=symbol, chartTF=timeframe)
+            action="CONFIG", symbol=symbol, chartTF=self.get_granularity(
+                self.getdata_params['timeframe'], self.getdata_params['compression']))
 
         # TODO Error
         # Error handling

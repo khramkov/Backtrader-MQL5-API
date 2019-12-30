@@ -56,13 +56,17 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
         Reconnect when network connection is down
 
+      - `useask` (default: False)
+        Use the ask price instead of the default bid price
+
     """
     params = (
-        ('historical', False),   # do backfilling at the start
-        ('backfill', True),      # do backfilling when reconnecting
-        ('backfill_from', None), # additional data source to do backfill from
+        ('historical', False),    # do backfilling at the start
+        ('backfill', True),       # do backfilling when reconnecting
+        ('backfill_from', None),  # additional data source to do backfill from
         ('include_last', False),
         ('reconnect', True),
+        ('useask', False)         # use the ask price instead of the default bid price
     )
 
     _store = mt5store.MTraderStore
@@ -77,6 +81,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
+        # self._useask = kwargs['useask']
         # self._candleFormat = 'bidask' if self.p.bidask else 'midpoint'
 
     def setenvironment(self, env):
@@ -89,7 +94,6 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         """Starts the MTrader connection and gets the real contract and
         contractdetails if it exists"""
         super(MTraderData, self).start()
-
         # Create attributes as soon as possible
         self._statelivereconn = False  # if reconnecting in live state
         self.qlive = self.o.q_livedata
@@ -97,17 +101,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
         # Kickstart store and get queue to wait on
         self.o.start(data=self)
-
-        # Check if the granularity is supported
-        data_tf = self.o.get_granularity(self._timeframe, self._compression)
-        if data_tf is None:
-            self.put_notification(self.NOTSUPPORTED_TF)
-            self._state = self._ST_OVER
-            return
-
-        # Configure server script symbol and time frame
-        # Error will be raised if params are not supported
-        self.o.config_server(self.p.dataname, data_tf)
+        self.o.config_server(self.p.dataname)
 
         # Backfill from external data feed
         if self.p.backfill_from is not None:
@@ -122,8 +116,10 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     def _st_start(self):
         self.put_notification(self.DELAYED)
 
-        date_begin = num2date(self.fromdate) if self.fromdate > float('-inf') else None
-        date_end = num2date(self.todate) if self.todate < float('inf') else None
+        date_begin = num2date(
+            self.fromdate) if self.fromdate > float('-inf') else None
+        date_end = num2date(
+            self.todate) if self.todate < float('inf') else None
 
         self.qhist = self.o.candles(self.p.dataname, date_begin, date_end, self._timeframe,
                                     self._compression, self.p.include_last)
@@ -170,9 +166,12 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
                         self._st_start()
                         continue
-
-                    if self._load_history(msg['data']):
-                        return True  # loading worked
+                    if self.p.timeframe == 1:  # if timeframe is ticks
+                        if self._load_tick(msg['data']):
+                            return True  # loading worked
+                    else:
+                        if self._load_history(msg['data']):
+                            return True  # loading worked
 
             elif self._state == self._ST_HISTORBACK:
                 msg = self.qhist.get()
@@ -182,7 +181,10 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                     self._state = self._ST_OVER
                     return False  # error management cancelled the queue
 
-                if msg:
+                if msg and self.p.timeframe == 1:  # if timeframe is ticks
+                    if self._load_tick(msg):
+                        return True  # loading worked
+                elif msg:
                     if self._load_history(msg):
                         return True  # loading worked
 
@@ -219,28 +221,28 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                     self._state = self._ST_OVER
                     return False
 
-    # def _load_tick(self, msg):
-    #     dtobj = datetime.utcfromtimestamp(int(msg['time']))
-    #     dt = date2num(dtobj)
-    #     if dt <= self.lines.datetime[-1]:
-    #         return False  # time already seen
-    #
-    #     # Common fields
-    #     self.lines.datetime[0] = dt
-    #     self.lines.volume[0] = 0.0
-    #     self.lines.openinterest[0] = 0.0
-    #
-    #     # Put the prices into the bar
-    #     tick = float(
-    #         msg['askprice']) if self.p.useask else float(
-    #         msg['bidprice'])
-    #     self.lines.open[0] = tick
-    #     self.lines.high[0] = tick
-    #     self.lines.low[0] = tick
-    #     self.lines.close[0] = tick
-    #     self.lines.volume[0] = 0.0
-    #     self.lines.openinterest[0] = 0.0
-    #     return True
+    def _load_tick(self, msg):
+        dtobj = datetime.utcfromtimestamp(int(msg[0]))
+        dt = date2num(dtobj)
+        if dt <= self.lines.datetime[-1]:
+            return False  # time already seen
+
+        # Common fields
+        self.lines.datetime[0] = dt
+        self.lines.volume[0] = 0.0
+        self.lines.openinterest[0] = 0.0
+
+        # Put the prices into the bar
+        tick = float(
+            msg[2]) if self.p.useask else float(
+            msg[1])
+        self.lines.open[0] = tick
+        self.lines.high[0] = tick
+        self.lines.low[0] = tick
+        self.lines.close[0] = tick
+        self.lines.volume[0] = 0.0
+        self.lines.openinterest[0] = 0.0
+        return True
 
     def _load_history(self, ohlcv):
         time_stamp, _open, _high, _low, _close, _volume = ohlcv
