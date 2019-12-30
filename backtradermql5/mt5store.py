@@ -295,7 +295,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         granularity = self._GRANULARITIES.get((frame, compression), None)
         if granularity is None:
             raise ValueError("Metatrader 5 doesn't support frame %s with compression %s" % \
-                             (bt.TimeFrame.getname(frame), compression))
+                             (bt.TimeFrame.getname(frame, compression), compression))
         return granularity
 
     def get_cash(self):
