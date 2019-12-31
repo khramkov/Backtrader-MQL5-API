@@ -7,7 +7,7 @@ from backtrader.feed import DataBase
 from backtrader import date2num, num2date
 from backtrader.utils.py3 import queue, with_metaclass
 
-from mt5 import mt5store
+from backtradermql5 import mt5store
 
 
 class MetaMTraderData(DataBase.__class__):
