@@ -108,10 +108,13 @@ cerebro.setbroker(broker)
 
 start_date = datetime.now() - timedelta(minutes=500)
 
-data = store.getdata(dataname='EURUSD', timeframe=bt.TimeFrame.Minutes,
-                     fromdate=start_date, compression=1) #, historical=True)
+data = store.getdata(dataname='EURUSD', timeframe=bt.TimeFrame.Ticks,
+                     fromdate=start_date) #, useask=True, historical=True)
 
-cerebro.adddata(data)
+cerebro.resampledata(data,
+                     timeframe=bt.TimeFrame.Seconds,
+                     compression=30
+                     )
 cerebro.run(stdstats=False)
 cerebro.plot(style='candlestick', volume=False)
 ```
