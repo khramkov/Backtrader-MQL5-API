@@ -198,7 +198,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     # MTrader supported granularities
     _GRANULARITIES = {
         (bt.TimeFrame.Ticks, 1): 'TICKS',
-        (bt.TimeFrame.Seconds, 10): 'SECONDS',
         (bt.TimeFrame.Minutes, 1): 'M1',
         (bt.TimeFrame.Minutes, 5): 'M5',
         (bt.TimeFrame.Minutes, 15): 'M15',
@@ -233,7 +232,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         params = {'timeframe': bt.TimeFrame.Days,
                   'compression': 1}
         params.update(kwargs)
-
         cls.getdata_params = params
         return cls.DataCls(*args, **kwargs)
 
@@ -350,13 +348,13 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         socket = self.oapi.live_socket()
         while True:
             try:
-                last_candle = socket.recv_json()
+                last_data = socket.recv_json()
                 if self.debug:
-                    print('ZMQ LIVE DATA: ', last_candle)
+                    print('ZMQ LIVE DATA: ', last_data)
             except zmq.ZMQError:
                 raise zmq.NotDone("Live data ERROR")
 
-            self.q_livedata.put(last_candle)
+            self.q_livedata.put(last_data)
 
     def _t_streaming_events(self):
         # create socket connection for the Thread

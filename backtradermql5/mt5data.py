@@ -81,7 +81,6 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
-        # self._useask = kwargs['useask']
         # self._candleFormat = 'bidask' if self.p.bidask else 'midpoint'
 
     def setenvironment(self, env):
@@ -94,6 +93,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         """Starts the MTrader connection and gets the real contract and
         contractdetails if it exists"""
         super(MTraderData, self).start()
+
         # Create attributes as soon as possible
         self._statelivereconn = False  # if reconnecting in live state
         self.qlive = self.o.q_livedata
@@ -101,6 +101,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
         # Kickstart store and get queue to wait on
         self.o.start(data=self)
+
+        # Configure server script symbol and time frame
         self.o.config_server(self.p.dataname)
 
         # Backfill from external data feed
@@ -222,10 +224,12 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                     return False
 
     def _load_tick(self, msg):
-        dtobj = datetime.utcfromtimestamp(int(msg[0]))
-        dt = date2num(dtobj)
+        time_stamp, _bid, _ask = msg
+        d_time = datetime.utcfromtimestamp(time_stamp)
+        dt = date2num(d_time)
+        # time already seen
         if dt <= self.lines.datetime[-1]:
-            return False  # time already seen
+            return False
 
         # Common fields
         self.lines.datetime[0] = dt
@@ -233,15 +237,11 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.lines.openinterest[0] = 0.0
 
         # Put the prices into the bar
-        tick = float(
-            msg[2]) if self.p.useask else float(
-            msg[1])
+        tick = float(_ask) if self.p.useask else float(_bid)
         self.lines.open[0] = tick
         self.lines.high[0] = tick
         self.lines.low[0] = tick
         self.lines.close[0] = tick
-        self.lines.volume[0] = 0.0
-        self.lines.openinterest[0] = 0.0
         return True
 
     def _load_history(self, ohlcv):
@@ -253,7 +253,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         if dt <= self.lines.datetime[-1]:
             return False
 
-        self.lines.datetime[0] = date2num(d_time)
+        self.lines.datetime[0] = dt
         self.lines.open[0] = _open
         self.lines.high[0] = _high
         self.lines.low[0] = _low
