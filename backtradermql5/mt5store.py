@@ -49,12 +49,13 @@ class MTraderAPI:
     # TODO: unify error handling
 
     def __init__(self, *args, **kwargs):
-        self.HOST = kwargs['host'] or 'localhost'
+
+        self.HOST = kwargs['host']
         self.SYS_PORT = 15555       # REP/REQ port
         self.DATA_PORT = 15556      # PUSH/PULL port
         self.LIVE_PORT = 15557      # PUSH/PULL port
         self.EVENTS_PORT = 15558    # PUSH/PULL port
-        self.debug = kwargs['debug'] or False
+        self.debug = kwargs['debug']
 
         # ZeroMQ timeout in seconds
         sys_timeout = 1
@@ -187,7 +188,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     BrokerCls = None  # broker class will autoregister
     DataCls = None  # data class will auto register
 
-    params = ()
+    params = (
+        ('host', 'localhost'),
+        ('debug', False)
+    )
 
     _DTEPOCH = datetime(1970, 1, 1)
 
@@ -229,6 +233,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         params = {'timeframe': bt.TimeFrame.Days,
                   'compression': 1}
         params.update(kwargs)
+
         cls.getdata_params = params
         return cls.DataCls(*args, **kwargs)
 
@@ -250,6 +255,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._ordersrev = collections.OrderedDict()  # map oid to order.ref
         self._orders_type = dict()  # keeps order types
 
+        kwargs.update({"host": self.params.host, "debug": self.params.debug})
         self.oapi = MTraderAPI(*args, **kwargs)
 
         self._cash = 0.0
@@ -259,7 +265,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         self._cancel_flag = False
 
-        self.debug = kwargs['debug'] or False
+        self.debug = self.params.debug
 
     def start(self, data=None, broker=None):
         # Datas require some processing to kickstart data reception
