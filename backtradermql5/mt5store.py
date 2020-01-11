@@ -11,6 +11,7 @@ from backtradermql5.adapter import PositionAdapter, OrderAdapter, BalanceAdapter
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from backtrader import date2num, num2date
 
 
 class MTraderError(Exception):
@@ -59,7 +60,7 @@ class MTraderAPI:
 
         # ZeroMQ timeout in seconds
         sys_timeout = 1
-        data_timeout = 30
+        data_timeout = self.debug = kwargs['datatimeout']
 
         # initialise ZMQ context
         context = zmq.Context()
@@ -190,14 +191,15 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
     params = (
         ('host', 'localhost'),
-        ('debug', False)
+        ('debug', False),
+        ('datatimeout', 10)
     )
 
     _DTEPOCH = datetime(1970, 1, 1)
 
     # MTrader supported granularities
     _GRANULARITIES = {
-        (bt.TimeFrame.Ticks, 1): 'TICKS',
+        (bt.TimeFrame.Ticks, 1): 'TICK',
         (bt.TimeFrame.Minutes, 1): 'M1',
         (bt.TimeFrame.Minutes, 5): 'M5',
         (bt.TimeFrame.Minutes, 15): 'M15',
@@ -229,10 +231,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     @classmethod
     def getdata(cls, *args, **kwargs):
         """Returns `DataCls` with args, kwargs"""
-        params = {'timeframe': bt.TimeFrame.Days,
-                  'compression': 1}
-        params.update(kwargs)
-        cls.getdata_params = params
         return cls.DataCls(*args, **kwargs)
 
     @classmethod
@@ -253,7 +251,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._ordersrev = collections.OrderedDict()  # map oid to order.ref
         self._orders_type = dict()  # keeps order types
 
-        kwargs.update({"host": self.params.host, "debug": self.params.debug})
+        kwargs.update({"host": self.params.host, "debug": self.params.debug,
+                       "datatimeout": self.params.datatimeout})
         self.oapi = MTraderAPI(*args, **kwargs)
 
         self._cash = 0.0
@@ -264,6 +263,9 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._cancel_flag = False
 
         self.debug = self.params.debug
+
+        # Clear any previous subscribed Symbols
+        self.reset_server()
 
     def start(self, data=None, broker=None):
         # Datas require some processing to kickstart data reception
@@ -349,8 +351,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         while True:
             try:
                 last_data = socket.recv_json()
-                if self.debug:
-                    print('ZMQ LIVE DATA: ', last_data)
+                # if self.debug:
+                print('ZMQ LIVE DATA: ', last_data)
             except zmq.ZMQError:
                 raise zmq.NotDone("Live data ERROR")
 
@@ -499,9 +501,9 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self._cancel_flag = True
             self.broker._cancel(oref)
 
-    def candles(self, dataname, dtbegin, dtend, timeframe, compression, include_first=False):
+    def price_data(self, dataname, dtbegin, dtend, timeframe, compression, include_first=False):
         tf = self.get_granularity(
-            self.getdata_params['timeframe'], self.getdata_params['compression'])
+            timeframe, compression)
 
         begin = end = None
         if dtbegin:
@@ -515,27 +517,96 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         data = self.oapi.construct_and_send(action="HISTORY", actionType="DATA", symbol=dataname,
                                             chartTF=tf, fromDate=begin, toDate=end)
-        candles = data['data']
+        price_data = data['data']
         # Remove last unclosed candle
         if not include_first:
             try:
-                del candles[-1]
+                del price_data[-1]
             except:
                 pass
 
         q = queue.Queue()
-        for c in candles:
+        for c in price_data:
             q.put(c)
 
         q.put({})
         return q
 
-    # def config_server(self, symbol: str, timeframe: str) -> None:
-    def config_server(self, symbol: str) -> None:
+    def reset_server(self) -> None:
+        """Set server terminal symbol and time frame"""
+        ret_val = self.oapi.construct_and_send(action="RESET")
+
+        # # TODO Error
+        # # Error handling
+        if ret_val["error"]:
+            print(ret_val)
+            if ret_val["description"] == "Wrong symbol dosn't exist":
+                raise ServerConfigError("Symbol dosn't exist")
+            self.put_notification(ret_val["description"])
+
+    def write_csv(self, symbol: str, timeframe: str, compression: int = 1, fromdate: datetime = None, todate: datetime = None) -> None:
+        """Request MT5 to write history data to CSV a file"""
+
+        if fromdate is None:
+            fromdate = float('-inf')
+        else:
+            fromdate = date2num(fromdate)
+
+        if todate is None:
+            todate = float('inf')
+        else:
+            todate = date2num(todate)
+
+        date_begin = num2date(
+            fromdate) if fromdate > float('-inf') else None
+        date_end = num2date(
+            todate) if todate < float('inf') else None
+
+        begin = end = None
+        if date_begin:
+            begin = int((date_begin - self._DTEPOCH).total_seconds())
+        if date_end:
+            end = int((date_end - self._DTEPOCH).total_seconds())
+
+        tf = self.get_granularity(timeframe, compression)
+
+        if self.debug:
+            print('Fetching: {}, Timeframe: {}, Fromdate: {}'.format(
+                symbol, tf, date_begin))
+
+        ret_val = self.oapi.construct_and_send(action="HISTORY", actionType="WRITE", symbol=symbol,
+                                               chartTF=tf, fromDate=begin, toDate=end)
+        # TODO Error
+        # Error handling
+        if ret_val["error"]:
+            if ret_val["description"] == "Wrong symbol dosn't exist":
+                raise ServerConfigError("Symbol dosn't exist")
+            self.put_notification(ret_val["description"])
+        else:
+            print(
+                f'Request to write CVS data for symbol {tf} and timeframe {tf} succeeded. Check MT5 EA logging for the exact output location ...')
+
+        # TODO live updates
+        # self.streaming_events()
+
+        # while True:
+        #   try:
+        #     msg = self.q_livedata.get()
+        #   except queue.Empty:
+        #     return None
+        #   if msg['type'] == "FLUSH":
+        #     print(msg['data'], end="\r", flush=True)
+        #   else:
+        #     print(msg['data'])
+
+        #   if msg['status']=='DISCONNECTED':
+        #     return
+
+    def config_server(self, symbol: str, timeframe: str, compression: int) -> None:
         """Set server terminal symbol and time frame"""
         conf = self.oapi.construct_and_send(
             action="CONFIG", symbol=symbol, chartTF=self.get_granularity(
-                self.getdata_params['timeframe'], self.getdata_params['compression']))
+                timeframe, compression))
 
         # TODO Error
         # Error handling

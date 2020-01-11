@@ -56,6 +56,8 @@ self.cancel(self.buy_order[0])
 
 ## Usage
 
+### Live trading example
+
 ```python
 import backtrader as bt
 from backtradermt5.mt5store import MTraderStore
@@ -110,13 +112,41 @@ start_date = datetime.now() - timedelta(minutes=500)
 
 data = store.getdata(dataname='EURUSD', timeframe=bt.TimeFrame.Ticks,
                      fromdate=start_date) #, useask=True, historical=True)
+                     # the parameter "useask" will request the ask price insetad if the default bid price
 
 cerebro.resampledata(data,
                      timeframe=bt.TimeFrame.Seconds,
                      compression=30
                      )
+
 cerebro.run(stdstats=False)
 cerebro.plot(style='candlestick', volume=False)
+```
+
+### Download CSV data
+
+You can instruct MT5 to download historical data as a CSV file. Files will be saved into the local Metatrader 5 Terminal installation folder:
+
+`[MT5 Terminal]/MQL/Files/Data`
+
+The example below downloads data for the past 6 months as tick data.
+
+```python
+from datetime import datetime, timedelta
+from backtradermql5.mt5store import MTraderStore
+import backtrader as bt
+
+store = MTraderStore(host='192.168.1.20') # Metatrader 5 running on a diffenet host
+
+start_date = datetime.now() - timedelta(months=6)
+
+cerebro = bt.Cerebro()
+data2 = store.getdata(dataname='EURUSD',
+                      timeframe=bt.TimeFrame.Ticks,
+                      fromdate=start_date
+                      )
+
+cerebro.run(stdstats=False)
 ```
 
 ## License
@@ -124,3 +154,7 @@ cerebro.plot(style='candlestick', volume=False)
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See `LICENSE` for more information.
+
+```
+
+```
