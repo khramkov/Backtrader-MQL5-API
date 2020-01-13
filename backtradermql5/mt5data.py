@@ -230,8 +230,9 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def _load_tick(self, msg):
         time_stamp, _bid, _ask = msg
+        # convert unix timestamp to float for millisecond resolution
         d_time = datetime.utcfromtimestamp(
-            time_stamp)
+            float(time_stamp) / 1000.0)
 
         dt = date2num(d_time)
 
