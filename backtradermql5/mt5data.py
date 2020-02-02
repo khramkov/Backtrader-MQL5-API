@@ -254,6 +254,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         return True
 
     def _load_candle(self, ohlcv):
+        # TODO support bid/ask using spread
         time_stamp, _open, _high, _low, _close, _volume = ohlcv
         d_time = datetime.utcfromtimestamp(
             time_stamp)
@@ -271,12 +272,4 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.lines.close[0] = _close
         self.lines.volume[0] = _volume
         self.lines.openinterest[0] = 0.0
-        return True
-
-        # Put the prices into the bar
-        tick = float(_ask) if self.p.useask else float(_bid)
-        self.lines.open[0] = tick
-        self.lines.high[0] = tick
-        self.lines.low[0] = tick
-        self.lines.close[0] = tick
         return True
