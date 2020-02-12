@@ -11,6 +11,7 @@ from backtradermql5.adapter import PositionAdapter, OrderAdapter, BalanceAdapter
 import backtrader as bt
 from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
+from backtrader import date2num, num2date
 
 
 class MTraderError(Exception):
@@ -48,16 +49,18 @@ class MTraderAPI:
     """
     # TODO: unify error handling
 
-    def __init__(self, host=None):
-        self.HOST = host or 'localhost'
+    def __init__(self, *args, **kwargs):
+
+        self.HOST = kwargs['host']
         self.SYS_PORT = 15555       # REP/REQ port
         self.DATA_PORT = 15556      # PUSH/PULL port
         self.LIVE_PORT = 15557      # PUSH/PULL port
         self.EVENTS_PORT = 15558    # PUSH/PULL port
+        self.debug = kwargs['debug']
 
         # ZeroMQ timeout in seconds
         sys_timeout = 1
-        data_timeout = 10
+        data_timeout = self.debug = kwargs['datatimeout']
 
         # initialise ZMQ context
         context = zmq.Context()
@@ -67,12 +70,14 @@ class MTraderAPI:
             self.sys_socket = context.socket(zmq.REQ)
             # set port timeout
             self.sys_socket.RCVTIMEO = sys_timeout * 1000
-            self.sys_socket.connect('tcp://{}:{}'.format(self.HOST, self.SYS_PORT))
+            self.sys_socket.connect(
+                'tcp://{}:{}'.format(self.HOST, self.SYS_PORT))
 
             self.data_socket = context.socket(zmq.PULL)
             # set port timeout
             self.data_socket.RCVTIMEO = data_timeout * 1000
-            self.data_socket.connect('tcp://{}:{}'.format(self.HOST, self.DATA_PORT))
+            self.data_socket.connect(
+                'tcp://{}:{}'.format(self.HOST, self.DATA_PORT))
         except zmq.ZMQError:
             raise zmq.ZMQBindError("Binding ports ERROR")
 
@@ -81,6 +86,8 @@ class MTraderAPI:
         try:
             self.sys_socket.send_json(data)
             msg = self.sys_socket.recv_string()
+            if self.debug:
+                print('ZMQ SYS REQUEST: ', data, ' -> ', msg)
             # terminal received the request
             assert msg == 'OK', 'Something wrong on server side'
         except AssertionError as err:
@@ -94,6 +101,8 @@ class MTraderAPI:
             msg = self.data_socket.recv_json()
         except zmq.ZMQError:
             raise zmq.NotDone('Data socket timeout ERROR')
+        if self.debug:
+            print('ZMQ DATA REPLY: ', msg)
         return msg
 
     def live_socket(self, context=None):
@@ -180,12 +189,17 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     BrokerCls = None  # broker class will autoregister
     DataCls = None  # data class will auto register
 
-    params = ()
+    params = (
+        ('host', 'localhost'),
+        ('debug', False),
+        ('datatimeout', 10)
+    )
 
     _DTEPOCH = datetime(1970, 1, 1)
 
     # MTrader supported granularities
     _GRANULARITIES = {
+        (bt.TimeFrame.Ticks, 1): 'TICK',
         (bt.TimeFrame.Minutes, 1): 'M1',
         (bt.TimeFrame.Minutes, 5): 'M5',
         (bt.TimeFrame.Minutes, 15): 'M15',
@@ -224,7 +238,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         """Returns broker with *args, **kwargs from registered `BrokerCls`"""
         return cls.BrokerCls(*args, **kwargs)
 
-    def __init__(self, host='localhost'):
+    def __init__(self, *args, **kwargs):
         super(MTraderStore, self).__init__()
 
         self.notifs = collections.deque()  # store notifications for cerebro
@@ -237,7 +251,9 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._ordersrev = collections.OrderedDict()  # map oid to order.ref
         self._orders_type = dict()  # keeps order types
 
-        self.oapi = MTraderAPI(host)
+        kwargs.update({"host": self.params.host, "debug": self.params.debug,
+                       "datatimeout": self.params.datatimeout})
+        self.oapi = MTraderAPI(*args, **kwargs)
 
         self._cash = 0.0
         self._value = 0.0
@@ -246,7 +262,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         self._cancel_flag = False
 
-        self.debug = True
+        self.debug = self.params.debug
+
+        # Clear any previous subscribed Symbols
+        self.reset_server()
 
     def start(self, data=None, broker=None):
         # Datas require some processing to kickstart data reception
@@ -294,8 +313,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def get_granularity(self, frame, compression):
         granularity = self._GRANULARITIES.get((frame, compression), None)
         if granularity is None:
-            raise ValueError("Metatrader 5 doesn't support frame %s with compression %s" % \
-                             (bt.TimeFrame.getname(frame), compression))
+            raise ValueError("Metatrader 5 doesn't support frame %s with compression %s" %
+                             (bt.TimeFrame.getname(frame, compression), compression))
         return granularity
 
     def get_cash(self):
@@ -331,11 +350,13 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         socket = self.oapi.live_socket()
         while True:
             try:
-                last_candle = socket.recv_json()
+                last_data = socket.recv_json()
+                # if self.debug:
+                print('ZMQ LIVE DATA: ', last_data)
             except zmq.ZMQError:
                 raise zmq.NotDone("Live data ERROR")
 
-            self.q_livedata.put(last_candle)
+            self.q_livedata.put(last_data)
 
     def _t_streaming_events(self):
         # create socket connection for the Thread
@@ -343,6 +364,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         while True:
             try:
                 transaction = socket.recv_json()
+                if self.debug:
+                    print('ZMQ STREAMING TRANSACTION: ', transaction)
             except zmq.ZMQError:
                 raise zmq.NotDone("Streaming data ERROR")
 
@@ -365,7 +388,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         side = 'buy' if order.isbuy() else 'sell'
         order_type = self._ORDEREXECS.get((order.exectype, side), None)
         if order_type is None:
-            raise ValueError("Wrong order type: %s or side: %s" % (order.exectype, side))
+            raise ValueError("Wrong order type: %s or side: %s" %
+                             (order.exectype, side))
 
         okwargs['actionType'] = order_type
         okwargs['symbol'] = order.data._dataname
@@ -470,14 +494,16 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 else:
                     self.cancel_order(oid, symbol)
             except Exception as e:
-                self.put_notification("Order not cancelled: {}, {}".format(oid, e))
+                self.put_notification(
+                    "Order not cancelled: {}, {}".format(oid, e))
                 continue
 
             self._cancel_flag = True
             self.broker._cancel(oref)
 
-    def candles(self, dataname, dtbegin, dtend, timeframe, compression, include_first=False):
-        tf = self.get_granularity(timeframe, compression)
+    def price_data(self, dataname, dtbegin, dtend, timeframe, compression, include_first=False):
+        tf = self.get_granularity(
+            timeframe, compression)
 
         begin = end = None
         if dtbegin:
@@ -486,28 +512,101 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             end = int((dtbegin - self._DTEPOCH).total_seconds())
 
         if self.debug:
-            print('Fetching: {}, Timeframe: {}, Fromdate: {}'.format(dataname, tf, dtbegin))
+            print('Fetching: {}, Timeframe: {}, Fromdate: {}'.format(
+                dataname, tf, dtbegin))
 
         data = self.oapi.construct_and_send(action="HISTORY", actionType="DATA", symbol=dataname,
-                                               chartTF=tf, fromDate=begin, toDate=end)
-        candles = data['data']
+                                            chartTF=tf, fromDate=begin, toDate=end)
+        price_data = data['data']
         # Remove last unclosed candle
         if not include_first:
             try:
-                del candles[-1]
+                del price_data[-1]
             except:
                 pass
 
         q = queue.Queue()
-        for c in candles:
+        for c in price_data:
             q.put(c)
 
         q.put({})
         return q
 
-    def config_server(self, symbol: str, timeframe: str) -> None:
+    def reset_server(self) -> None:
         """Set server terminal symbol and time frame"""
-        conf = self.oapi.construct_and_send(action="CONFIG", symbol=symbol, chartTF=timeframe)
+        ret_val = self.oapi.construct_and_send(action="RESET")
+
+        # # TODO Error
+        # # Error handling
+        if ret_val["error"]:
+            print(ret_val)
+            if ret_val["description"] == "Wrong symbol dosn't exist":
+                raise ServerConfigError("Symbol dosn't exist")
+            self.put_notification(ret_val["description"])
+
+    def write_csv(self, symbol: str, timeframe: str, compression: int = 1, fromdate: datetime = None, todate: datetime = None) -> None:
+        """Request MT5 to write history data to CSV a file"""
+
+        if fromdate is None:
+            fromdate = float('-inf')
+        else:
+            fromdate = date2num(fromdate)
+
+        if todate is None:
+            todate = float('inf')
+        else:
+            todate = date2num(todate)
+
+        date_begin = num2date(
+            fromdate) if fromdate > float('-inf') else None
+        date_end = num2date(
+            todate) if todate < float('inf') else None
+
+        begin = end = None
+        if date_begin:
+            begin = int((date_begin - self._DTEPOCH).total_seconds())
+        if date_end:
+            end = int((date_end - self._DTEPOCH).total_seconds())
+
+        tf = self.get_granularity(timeframe, compression)
+
+        if self.debug:
+            print('Fetching: {}, Timeframe: {}, Fromdate: {}'.format(
+                symbol, tf, date_begin))
+
+        ret_val = self.oapi.construct_and_send(action="HISTORY", actionType="WRITE", symbol=symbol,
+                                               chartTF=tf, fromDate=begin, toDate=end)
+        # TODO Error
+        # Error handling
+        if ret_val["error"]:
+            if ret_val["description"] == "Wrong symbol dosn't exist":
+                raise ServerConfigError("Symbol dosn't exist")
+            self.put_notification(ret_val["description"])
+        else:
+            print(
+                f'Request to write CVS data for symbol {tf} and timeframe {tf} succeeded. Check MT5 EA logging for the exact output location ...')
+
+        # TODO live updates
+        # self.streaming_events()
+
+        # while True:
+        #   try:
+        #     msg = self.q_livedata.get()
+        #   except queue.Empty:
+        #     return None
+        #   if msg['type'] == "FLUSH":
+        #     print(msg['data'], end="\r", flush=True)
+        #   else:
+        #     print(msg['data'])
+
+        #   if msg['status']=='DISCONNECTED':
+        #     return
+
+    def config_server(self, symbol: str, timeframe: str, compression: int) -> None:
+        """Set server terminal symbol and time frame"""
+        conf = self.oapi.construct_and_send(
+            action="CONFIG", symbol=symbol, chartTF=self.get_granularity(
+                timeframe, compression))
 
         # TODO Error
         # Error handling
@@ -532,7 +631,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if self.debug:
             print('Closing position: {}, on symbol: {}'.format(oid, symbol))
 
-        conf = self.oapi.construct_and_send(action="TRADE", actionType='POSITION_CLOSE_ID', symbol=symbol, id=oid)
+        conf = self.oapi.construct_and_send(
+            action="TRADE", actionType='POSITION_CLOSE_ID', symbol=symbol, id=oid)
         print(conf)
         # Error handling
         if conf["error"]:
@@ -542,7 +642,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if self.debug:
             print('Cancelling order: {}, on symbol: {}'.format(oid, symbol))
 
-        conf = self.oapi.construct_and_send(action="TRADE", actionType='ORDER_CANCEL', symbol=symbol, id=oid)
+        conf = self.oapi.construct_and_send(
+            action="TRADE", actionType='ORDER_CANCEL', symbol=symbol, id=oid)
         print(conf)
         # Error handling
         if conf["error"]:

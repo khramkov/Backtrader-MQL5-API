@@ -56,13 +56,17 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
         Reconnect when network connection is down
 
+      - `useask` (default: False)
+        Use the ask price instead of the default bid price
+
     """
     params = (
-        ('historical', False),   # do backfilling at the start
-        ('backfill', True),      # do backfilling when reconnecting
-        ('backfill_from', None), # additional data source to do backfill from
+        ('historical', False),    # do backfilling at the start
+        ('backfill', True),       # do backfilling when reconnecting
+        ('backfill_from', None),  # additional data source to do backfill from
         ('include_last', False),
         ('reconnect', True),
+        ('useask', False)         # use the ask price instead of the default bid price
     )
 
     _store = mt5store.MTraderStore
@@ -78,6 +82,9 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
         # self._candleFormat = 'bidask' if self.p.bidask else 'midpoint'
+        #self.symbol = self.p.dataname
+        #self.timeframe = self.p.timeframe
+        #self.compression = self.p.compression
 
     def setenvironment(self, env):
         """Receives an environment (cerebro) and passes it over to the store it
@@ -98,16 +105,9 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         # Kickstart store and get queue to wait on
         self.o.start(data=self)
 
-        # Check if the granularity is supported
-        data_tf = self.o.get_granularity(self._timeframe, self._compression)
-        if data_tf is None:
-            self.put_notification(self.NOTSUPPORTED_TF)
-            self._state = self._ST_OVER
-            return
-
-        # Configure server script symbol and time frame
-        # Error will be raised if params are not supported
-        self.o.config_server(self.p.dataname, data_tf)
+        # Add server script symbol and time frame
+        self.o.config_server(
+            self.p.dataname, self.p.timeframe, self.p.compression)
 
         # Backfill from external data feed
         if self.p.backfill_from is not None:
@@ -122,11 +122,13 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     def _st_start(self):
         self.put_notification(self.DELAYED)
 
-        date_begin = num2date(self.fromdate) if self.fromdate > float('-inf') else None
-        date_end = num2date(self.todate) if self.todate < float('inf') else None
+        date_begin = num2date(
+            self.fromdate) if self.fromdate > float('-inf') else None
+        date_end = num2date(
+            self.todate) if self.todate < float('inf') else None
 
-        self.qhist = self.o.candles(self.p.dataname, date_begin, date_end, self._timeframe,
-                                    self._compression, self.p.include_last)
+        self.qhist = self.o.price_data(self.p.dataname, date_begin, date_end, self.p.timeframe,
+                                       self.p.compression, self.p.include_last)
 
         self._state = self._ST_HISTORBACK
 
@@ -171,8 +173,13 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                         self._st_start()
                         continue
 
-                    if self._load_history(msg['data']):
-                        return True  # loading worked
+                    if msg['timeframe'] == self.o.get_granularity(self.p.timeframe, self.p.compression) and msg['symbol'] == self.p.dataname:
+                        if msg['timeframe'] == "TICK":
+                            if self._load_tick(msg['data']):
+                                return True  # loading worked
+                        else:
+                            if self._load_candle(msg['data']):
+                                return True  # loading worked
 
             elif self._state == self._ST_HISTORBACK:
                 msg = self.qhist.get()
@@ -181,9 +188,11 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                     self.put_notification(self.DISCONNECTED)
                     self._state = self._ST_OVER
                     return False  # error management cancelled the queue
-
-                if msg:
-                    if self._load_history(msg):
+                if msg and self.p.timeframe == 1:  # if timeframe is ticks
+                    if self._load_tick(msg):
+                        return True  # loading worked
+                elif msg:
+                    if self._load_candle(msg):
                         return True  # loading worked
 
                     continue  # not loaded ... date may have been seen
@@ -219,39 +228,44 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                     self._state = self._ST_OVER
                     return False
 
-    # def _load_tick(self, msg):
-    #     dtobj = datetime.utcfromtimestamp(int(msg['time']))
-    #     dt = date2num(dtobj)
-    #     if dt <= self.lines.datetime[-1]:
-    #         return False  # time already seen
-    #
-    #     # Common fields
-    #     self.lines.datetime[0] = dt
-    #     self.lines.volume[0] = 0.0
-    #     self.lines.openinterest[0] = 0.0
-    #
-    #     # Put the prices into the bar
-    #     tick = float(
-    #         msg['askprice']) if self.p.useask else float(
-    #         msg['bidprice'])
-    #     self.lines.open[0] = tick
-    #     self.lines.high[0] = tick
-    #     self.lines.low[0] = tick
-    #     self.lines.close[0] = tick
-    #     self.lines.volume[0] = 0.0
-    #     self.lines.openinterest[0] = 0.0
-    #     return True
-
-    def _load_history(self, ohlcv):
-        time_stamp, _open, _high, _low, _close, _volume = ohlcv
-        d_time = datetime.utcfromtimestamp(time_stamp)
+    def _load_tick(self, msg):
+        time_stamp, _bid, _ask = msg
+        # convert unix timestamp to float for millisecond resolution
+        d_time = datetime.utcfromtimestamp(
+            float(time_stamp) / 1000.0)
 
         dt = date2num(d_time)
+
         # time already seen
         if dt <= self.lines.datetime[-1]:
             return False
 
-        self.lines.datetime[0] = date2num(d_time)
+        # Common fields
+        self.lines.datetime[0] = dt
+        self.lines.volume[0] = 0.0
+        self.lines.openinterest[0] = 0.0
+
+        # Put the prices into the bar
+        tick = float(_ask) if self.p.useask else float(_bid)
+        self.lines.open[0] = tick
+        self.lines.high[0] = tick
+        self.lines.low[0] = tick
+        self.lines.close[0] = tick
+        return True
+
+    def _load_candle(self, ohlcv):
+        # TODO support bid/ask using spread
+        time_stamp, _open, _high, _low, _close, _volume = ohlcv
+        d_time = datetime.utcfromtimestamp(
+            time_stamp)
+
+        dt = date2num(d_time)
+
+        # time already seen
+        if dt <= self.lines.datetime[-1]:
+            return False
+
+        self.lines.datetime[0] = dt
         self.lines.open[0] = _open
         self.lines.high[0] = _high
         self.lines.low[0] = _low
