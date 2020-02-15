@@ -261,6 +261,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.lines.high[0] = tick
         self.lines.low[0] = tick
         self.lines.close[0] = tick
+
         return True
 
     def _load_candle(self, ohlcv):
