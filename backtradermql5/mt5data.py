@@ -55,11 +55,15 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
         Reconnect when network connection is down
 
-      - `useask` (default: False)
-        Use the ask price instead of the default bid price
+      - `useask` (default: `False`)
         
-      - `addspread` (default: False)
+        When requsting tick data use the ask price instead of the default bid price.
+        Only works with tick data.
+        
+      - `addspread` (default: `False`)
+        
         Add spread difference to candle price data.
+        Only works with candle data.
 
     """
 
@@ -275,7 +279,10 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
             return False
 
         def addspread(p, s):
-            return round(sum([float(p), float(s)]), 5)
+            if self.p.dataname.endswith("JPY"):
+                return round(sum([float(p), int(s) * 0.001]), 3)
+            else:
+                return round(sum([float(p), int(s) * 0.00001]), 5)
 
         self.lines.datetime[0] = dt
         self.lines.open[0] = (
