@@ -275,7 +275,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
             return False
 
         def addspread(p, s):
-            return round(sum([float(p), float(-s)]), 5)
+            return round(sum([float(p), float(s)]), 5)
 
         self.lines.datetime[0] = dt
         self.lines.open[0] = (
