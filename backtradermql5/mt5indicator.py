@@ -1,74 +1,54 @@
-# from backtrader.indicators import Indicator
-import backtrader as bt
-from backtrader import date2num, num2date
+from backtrader import bt
+
 import uuid
 
 
-class MTraderIndicator(bt.Indicator):
-    lines = (
-        "val1",
-        "val2",
-        "val3",
-        "val4",
-        "val5",
-        "val6",
-        "val7",
-        "val8",
-        "val9",
-        "val10",
-    )
-    params = dict(indicator="", params=[],)  # movav=btind.MovAv.Simple
+def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
 
-    def __init__(self):
-        # self.addminperiod(self.params.period)
-        # self.store = self.data._store
+    globals()["lines"] = lines
+    globals()["params"] = kwargs
 
-        self.timeframe = self.data._timeframe
-        self.compression = self.data._compression
-        self.indicator = self.p.indicator
-        self.indicatorParams = self.p.params
-        self.id = str(uuid.uuid4())
-        self.symbol = self.data._name
-        # print(self.data.open[0])
-        # self.lines.val = 1.0
+    def setAttributes():
+        setattr(MTraderIndicator, "mtstore", mtstore)
+        setattr(MTraderIndicator, "data_obj", data_obj)
 
-    def nextstart(self):
-        print("------------Setup and configure MT5 indicator here")
-        self.store = self.data.o
-        fromDate = str(self.data.datetime.datetime())  # .timestamp()
-        self.store.config_indicator(
-            fromDate,
-            self.symbol,
-            self.timeframe,
-            self.compression,
-            self.indicator,
-            self.id,
-            self.indicatorParams,
-        )
-        self.indicatorId = 1.0
-        self.lines.val1[0] = 1.0
+    class MTraderIndicator(bt.Indicator):
 
-    def nextX(self):
-        timestamp = self.data.datetime.datetime().timestamp()
-        print(timestamp)
-        # print(self.timeframe, self.compression)
-        # periodData = []
-        # a = [
-        #     num2date(x).timestamp()
-        #     for x in self.data.datetime.get(size=self.p.period).tolist()
-        # ]
-        # periodData.append(a)
-        # periodData.append(self.data.datetime.get(size=self.p.period).tolist())
-        # periodData.append(self.data.open.get(size=self.p.period).tolist())
-        # periodData.append(self.data.high.get(size=self.p.period).tolist())
-        # periodData.append(self.data.low.get(size=self.p.period).tolist())
-        # periodData.append(self.data.close.get(size=self.p.period).tolist())
-        # print(num2date(periodData[0][1]).timestamp())
-        # print(self.data.datetime.datetime())
-        # for a in periodData:
-        #     print("a", a)
+        lines = lines
+        params = params
 
-        self.store.indicator(self.indicatorId, timestamp)
+        def __init__(self):
 
-        self.lines.val1[0] = 1.0
+            self.p.timeframe = self.data_obj._timeframe
+            self.p.compression = self.data_obj._compression
+            self.p.indicator = self.p.indicator
+            self.p.params = self.p.params
+            self.p.id = str(uuid.uuid4())
+            self.p.symbol = self.data_obj._name
+            self.p.linecount = len(lines)
+            ret_val = self.mtstore.config_indicator(
+                self.p.symbol,
+                self.p.timeframe,
+                self.p.compression,
+                self.p.indicator,
+                self.p.id,
+                self.p.params,
+                self.p.linecount,
+            )
 
+            self.p.indicatorId = ret_val["id"]
+
+        def next(self):
+            fromDate = int(self.data_obj.datetime.datetime().timestamp())
+
+            ret_val = self.mtstore.indicator(self.p.indicatorId, fromDate)
+
+            # TODO error handling
+            i = 0
+            for d in ret_val["data"]:
+                self.lines[i][0] = float(ret_val["data"][i])
+                i += 1
+
+    setAttributes()
+
+    return MTraderIndicator

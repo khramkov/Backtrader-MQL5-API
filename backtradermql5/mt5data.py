@@ -82,6 +82,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     # States for the Finite State Machine in _load
     _ST_FROM, _ST_START, _ST_LIVE, _ST_HISTORBACK, _ST_OVER = range(5)
 
+    _historyback_queue_size = 0
+
     def islive(self):
         """True notifies `Cerebro` that `preloading` and `runonce`
         should be deactivated"""
@@ -198,6 +200,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
             elif self._state == self._ST_HISTORBACK:
                 msg = self.qhist.get()
+                # Queue size of historical price data
+                self._historyback_queue_size = self.qhist.qsize()
                 if msg is None:
                     # Situation not managed. Simply bail out
                     self.put_notification(self.DISCONNECTED)

@@ -12,6 +12,9 @@ from backtrader.metabase import MetaParams
 from backtrader.utils.py3 import queue, with_metaclass
 from backtrader import date2num, num2date
 
+import random
+import json
+
 
 class MTraderError(Exception):
     def __init__(self, *args, **kwargs):
@@ -51,11 +54,14 @@ class MTraderAPI:
 
     def __init__(self, *args, **kwargs):
 
+        # self.LOCAL_HOST = '*'
         self.HOST = kwargs["host"]
         self.SYS_PORT = 15555  # REP/REQ port
         self.DATA_PORT = 15556  # PUSH/PULL port
         self.LIVE_PORT = 15557  # PUSH/PULL port
         self.EVENTS_PORT = 15558  # PUSH/PULL port
+        self.INDICATOR_DATA_PORT = 15559  # REP/REQ port
+        self.CHART_PORT = 15560  # PUSH/PULL port
         self.debug = kwargs["debug"]
 
         # ZeroMQ timeout in seconds
@@ -76,6 +82,19 @@ class MTraderAPI:
             # set port timeout
             self.data_socket.RCVTIMEO = data_timeout * 1000
             self.data_socket.connect("tcp://{}:{}".format(self.HOST, self.DATA_PORT))
+
+            self.indicator_data_socket = context.socket(zmq.PULL)
+            # set port timeout
+            self.indicator_data_socket.RCVTIMEO = data_timeout * 1000
+            self.indicator_data_socket.connect(
+                "tcp://{}:{}".format(self.HOST, self.INDICATOR_DATA_PORT)
+            )
+            self.chart_socket = context.socket(zmq.PUSH)
+            # set port timeout
+            # TODO send timeout instead and/or run on separate thread
+            self.chart_socket.RCVTIMEO = sys_timeout * 1000
+            self.chart_socket.connect("tcp://{}:{}".format(self.HOST, self.CHART_PORT))
+
         except zmq.ZMQError:
             raise zmq.ZMQBindError("Binding ports ERROR")
 
@@ -103,6 +122,16 @@ class MTraderAPI:
             print("ZMQ DATA REPLY: ", msg)
         return msg
 
+    def _indicator_pull_reply(self):
+        """Get reply from server via Data socket with timeout"""
+        try:
+            msg = self.indicator_data_socket.recv_json()
+        except zmq.ZMQError:
+            raise zmq.NotDone("Indicator Data socket timeout ERROR")
+        if self.debug:
+            print("ZMQ INDICATOR DATA REPLY: ", msg)
+        return msg
+
     def live_socket(self, context=None):
         """Connect to socket in a ZMQ context"""
         try:
@@ -122,6 +151,25 @@ class MTraderAPI:
         except zmq.ZMQError:
             raise zmq.ZMQBindError("Data port connection ERROR")
         return socket
+
+    def _send_chart_message(self, data: dict) -> None:
+        """Send message for chart control to server via ZeroMQ System socket"""
+        try:
+            # topic = random.randrange(9999,10005)
+            # messagedata = random.randrange(1,215) - 80
+            # print("%d %d" % (topic, messagedata))
+            # self.chart_socket.send("%d %d".encode("ascii") % (topic, messagedata))
+            self.chart_socket.send_json(data)
+            # self.chart_socket.send_multipart([b"test", json.dumps(data).encode()])
+            # msg = self.sys_socket.recv_string()
+            # if self.debug:
+            #    print("ZMQ SYS REQUEST: ", data, " -> ", msg)
+            # terminal received the request
+            # assert msg == "OK", "Something wrong on server side"
+        # except AssertionError as err:
+        #    raise zmq.NotDone(err)
+        except zmq.ZMQError:
+            raise zmq.NotDone("Sending request ERROR")
 
     def construct_and_send(self, **kwargs) -> dict:
         """Construct a request dictionary from default and send it to server"""
@@ -145,6 +193,10 @@ class MTraderAPI:
             "comment": None,
             "indicatorName": None,
             "indicatorParams": None,
+            "chartId": None,
+            "indicatorChartId": None,
+            "chartIndicatorSubWindow": None,
+            "style": None,
         }
 
         # update dict values if exist
@@ -159,6 +211,58 @@ class MTraderAPI:
 
         # return server reply
         return self._pull_reply()
+
+    def indicator_construct_and_send(self, **kwargs) -> dict:
+        """Construct a request dictionary from default and send it to server"""
+
+        # default dictionary
+        request = {
+            "action": None,
+            "actionType": None,
+            "id": None,
+            "symbol": None,
+            "chartTF": None,
+            "fromDate": None,
+            "toDate": None,
+            "name": None,
+            "params": None,
+            "linecount": None,
+        }
+
+        # update dict values if exist
+        for key, value in kwargs.items():
+            if key in request:
+                request[key] = value
+            else:
+                raise KeyError("Unknown key in **kwargs ERROR")
+
+        # send dict to server
+        self._send_request(request)
+
+        # return server reply
+        return self._indicator_pull_reply()
+
+    def chart_construct_and_send(self, **kwargs) -> dict:
+        """Construct a request dictionary from default and send it to server"""
+
+        # default dictionary
+        message = {
+            "action": None,
+            "actionType": None,
+            "chartId": None,
+            "indicatorChartId": None,
+            "data": None,
+        }
+
+        # update dict values if exist
+        for key, value in kwargs.items():
+            if key in message:
+                message[key] = value
+            else:
+                raise KeyError("Unknown key in **kwargs ERROR")
+
+        # send dict to server
+        self._send_chart_message(message)
 
 
 class MetaSingleton(MetaParams):
@@ -534,7 +638,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         price_data = data["data"]
         # Remove last unclosed candle
         # TODO Is this relevant for ticks?
-        if not include_first and tf != "TICK":  # test: except for ticks
+        if not include_first and tf != "TICK":
             try:
                 del price_data[-1]
             except:
@@ -547,8 +651,75 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         q.put({})
         return q
 
+    def config_chart(self, chartId, dataname, timeframe, compression):
+        tf = self.get_granularity(timeframe, compression)
+        # Creating a chart with Ticks is not supported
+        if tf == "TICK":
+            raise ValueError(
+                "Metatrader 5 Charts don't support frame %s with \
+                compression %s"
+                % (bt.TimeFrame.getname(timeframe, compression), compression)
+            )
+        if self.debug:
+            print(
+                """
+                  Symbol: {}
+                  Timeframe: {}
+                  Compression: {}
+                """.format(
+                    dataname, tf, compression
+                )
+            )
+
+        ret_val = self.oapi.construct_and_send(
+            action="CHART",
+            actionType="OPEN",
+            chartId=chartId,
+            symbol=dataname,
+            chartTF=tf,
+        )
+
+        # TODO error handling
+        # if ret_val.key["error"]:
+        #    print(ret_val)
+        #    raise ServerConfigError("error starting indicator")
+        #    self.put_notification(ret_val["description"])
+        #    return False
+        # else:
+        return ret_val
+
+    def chart_add_indicator_chart(
+        self, chartId, indicatorChartId, chartIndicatorSubWindow, style
+    ):
+
+        if self.debug:
+            print(
+                "Chart id: {}, IndicatorChartId: {}".format(chartId, indicatorChartId)
+            )
+
+        data = self.oapi.construct_and_send(
+            action="CHART",
+            actionType="ADDINDICATOR",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            chartIndicatorSubWindow=chartIndicatorSubWindow,
+            style=style,
+        )
+
+    def chart(self, chartId, indicatorChartId, data):
+
+        if self.debug:
+            print("Chart id: {}, Data: {}".format(chartId, data))
+
+        data = self.oapi.chart_construct_and_send(
+            action="DRAW",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            data=data,
+        )
+
     def config_indicator(
-        self, fromDate, symbol, timeframe, compression, indicatorName, id, params,
+        self, symbol, timeframe, compression, name, id, params, linecount
     ):
         tf = self.get_granularity(timeframe, compression)
         if tf == "TICK":
@@ -560,72 +731,69 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if self.debug:
             print(
                 """
-                  Symbol: {},
-                  Indicator: {},
-                  Timeframe: {},
-                  Indicator options: {}
+                  Symbol: {}
+                  Indicator: {}
+                  Indicator Params: {}
+                  Timeframe: {}
+                  Compression: {}
                 """.format(
-                    symbol, indicatorName, tf, params
+                    symbol, name, params, tf, compression
                 )
             )
-        # print(
-        #    "timetamp", date2num(datetime.utcfromtimestamp(float(timestamp) / 1000.0))
-        # )
-        data = self.oapi.construct_and_send(
+
+        ret_val = self.oapi.indicator_construct_and_send(
             action="INDICATOR",
-            actionType="CONFIG",
-            fromDate=fromDate,
+            actionType="START",
             symbol=symbol,
-            indicatorName=indicatorName,
+            name=name,
+            linecount=linecount,
             id=id,
-            indicatorParams=params,
+            params=params,
             chartTF=tf,
         )
 
         # TODO error handling
+        # if ret_val.key["error"]:
+        #    print(ret_val)
+        #    raise ServerConfigError("error starting indicator")
+        #    self.put_notification(ret_val["description"])
+        #    return False
+        # else:
+        return ret_val
 
     def indicator(
-        # self, id, timestamp, indicatorId, include_first=False,
-        self,
-        indicatorId,
-        timestamp,
-        include_first=False,
+        self, indicatorId, fromDate,
     ):
 
         if self.debug:
-            print("Timestamp: {}, Indicator Id: {}".format(timestamp, id))
+            print(
+                "Timestamp: {}, Indicator Id: {}".format(
+                    datetime.utcfromtimestamp(float(fromDate)), id
+                )
+            )
 
-        data = self.oapi.construct_and_send(
+        data = self.oapi.indicator_construct_and_send(
             action="INDICATOR",
             actionType="REQUEST",
             id=indicatorId,
-            timestamp=timestamp,
+            fromDate=fromDate,
             # indicatorId=indicatorId,
         )
+
         # TODO error handling
-
-        indicator_data = data["data"]
-        # Remove last unclosed candle
-
-        if not include_first:
-            try:
-                del indicator_data[-1]
-            except:
-                pass
-
-        q = queue.Queue()
-        for c in indicator_data:
-            q.put(c)
-
-        q.put({})
-        return q
+        # if ret_val["error"]:
+        #    print(ret_val)
+        #    raise ServerConfigError("error starting indicator")
+        #    self.put_notification(ret_val["description"])
+        # else:
+        return data
 
     def reset_server(self) -> None:
         """Set server terminal symbol and time frame"""
         ret_val = self.oapi.construct_and_send(action="RESET")
 
-        # # TODO Error
-        # # Error handling
+        # TODO Error
+        # Error handling
         if ret_val["error"]:
             print(ret_val)
             if ret_val["description"] == "Wrong symbol dosn't exist":
@@ -828,4 +996,3 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             if request["type"].endswith("_SELL"):
                 size = -size
             self.broker._fill(oref, size, price, reason=request["type"])
-
