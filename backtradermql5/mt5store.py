@@ -44,6 +44,16 @@ class StreamError(MTraderError):
         super(self.__class__, self).__init__(*args, **kwargs)
 
 
+class IndicatorError(MTraderError):
+    def __init__(self, *args, **kwargs):
+        super(self.IndicatorError, self).__init__(*args, **kwargs)
+
+
+class ChartError(MTraderError):
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+
+
 class MTraderAPI:
     """
     This class implements Python side for MQL5 JSON API
@@ -61,7 +71,7 @@ class MTraderAPI:
         self.LIVE_PORT = 15557  # PUSH/PULL port
         self.EVENTS_PORT = 15558  # PUSH/PULL port
         self.INDICATOR_DATA_PORT = 15559  # REP/REQ port
-        self.CHART_PORT = 15560  # PUSH/PULL port
+        self.CHART_DATA_PORT = 15560  # PUSH port
         self.debug = kwargs["debug"]
 
         # ZeroMQ timeout in seconds
@@ -89,11 +99,12 @@ class MTraderAPI:
             self.indicator_data_socket.connect(
                 "tcp://{}:{}".format(self.HOST, self.INDICATOR_DATA_PORT)
             )
-            self.chart_socket = context.socket(zmq.PUSH)
+            self.chart_data_socket = context.socket(zmq.PUSH)
             # set port timeout
-            # TODO send timeout instead and/or run on separate thread
-            self.chart_socket.RCVTIMEO = sys_timeout * 1000
-            self.chart_socket.connect("tcp://{}:{}".format(self.HOST, self.CHART_PORT))
+            # TODO check if port is listening and error handling
+            self.chart_data_socket.connect(
+                "tcp://{}:{}".format(self.HOST, self.CHART_DATA_PORT)
+            )
 
         except zmq.ZMQError:
             raise zmq.ZMQBindError("Binding ports ERROR")
@@ -152,22 +163,10 @@ class MTraderAPI:
             raise zmq.ZMQBindError("Data port connection ERROR")
         return socket
 
-    def _send_chart_message(self, data: dict) -> None:
-        """Send message for chart control to server via ZeroMQ System socket"""
+    def _push_chart_data(self, data: dict) -> None:
+        """Send message for chart control to server via ZeroMQ chart data socket"""
         try:
-            # topic = random.randrange(9999,10005)
-            # messagedata = random.randrange(1,215) - 80
-            # print("%d %d" % (topic, messagedata))
-            # self.chart_socket.send("%d %d".encode("ascii") % (topic, messagedata))
-            self.chart_socket.send_json(data)
-            # self.chart_socket.send_multipart([b"test", json.dumps(data).encode()])
-            # msg = self.sys_socket.recv_string()
-            # if self.debug:
-            #    print("ZMQ SYS REQUEST: ", data, " -> ", msg)
-            # terminal received the request
-            # assert msg == "OK", "Something wrong on server side"
-        # except AssertionError as err:
-        #    raise zmq.NotDone(err)
+            self.chart_data_socket.send_json(data)
         except zmq.ZMQError:
             raise zmq.NotDone("Sending request ERROR")
 
@@ -242,7 +241,7 @@ class MTraderAPI:
         # return server reply
         return self._indicator_pull_reply()
 
-    def chart_construct_and_send(self, **kwargs) -> dict:
+    def chart_data_construct_and_send(self, **kwargs) -> dict:
         """Construct a request dictionary from default and send it to server"""
 
         # default dictionary
@@ -262,7 +261,7 @@ class MTraderAPI:
                 raise KeyError("Unknown key in **kwargs ERROR")
 
         # send dict to server
-        self._send_chart_message(message)
+        self._push_chart_data(message)
 
 
 class MetaSingleton(MetaParams):
@@ -651,212 +650,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         q.put({})
         return q
 
-    def config_chart(self, chartId, dataname, timeframe, compression):
-        tf = self.get_granularity(timeframe, compression)
-        # Creating a chart with Ticks is not supported
-        if tf == "TICK":
-            raise ValueError(
-                "Metatrader 5 Charts don't support frame %s with \
-                compression %s"
-                % (bt.TimeFrame.getname(timeframe, compression), compression)
-            )
-        if self.debug:
-            print(
-                """
-                  Symbol: {}
-                  Timeframe: {}
-                  Compression: {}
-                """.format(
-                    dataname, tf, compression
-                )
-            )
-
-        ret_val = self.oapi.construct_and_send(
-            action="CHART",
-            actionType="OPEN",
-            chartId=chartId,
-            symbol=dataname,
-            chartTF=tf,
-        )
-
-        # TODO error handling
-        # if ret_val.key["error"]:
-        #    print(ret_val)
-        #    raise ServerConfigError("error starting indicator")
-        #    self.put_notification(ret_val["description"])
-        #    return False
-        # else:
-        return ret_val
-
-    def chart_add_indicator_chart(
-        self, chartId, indicatorChartId, chartIndicatorSubWindow, style
-    ):
-
-        if self.debug:
-            print(
-                "Chart id: {}, IndicatorChartId: {}".format(chartId, indicatorChartId)
-            )
-
-        data = self.oapi.construct_and_send(
-            action="CHART",
-            actionType="ADDINDICATOR",
-            chartId=chartId,
-            indicatorChartId=indicatorChartId,
-            chartIndicatorSubWindow=chartIndicatorSubWindow,
-            style=style,
-        )
-
-    def chart(self, chartId, indicatorChartId, data):
-
-        if self.debug:
-            print("Chart id: {}, Data: {}".format(chartId, data))
-
-        data = self.oapi.chart_construct_and_send(
-            action="DRAW",
-            chartId=chartId,
-            indicatorChartId=indicatorChartId,
-            data=data,
-        )
-
-    def config_indicator(
-        self, symbol, timeframe, compression, name, id, params, linecount
-    ):
-        tf = self.get_granularity(timeframe, compression)
-        if tf == "TICK":
-            raise ValueError(
-                "Metatrader 5 Indicators don't support frame %s with \
-                compression %s"
-                % (bt.TimeFrame.getname(timeframe, compression), compression)
-            )
-        if self.debug:
-            print(
-                """
-                  Symbol: {}
-                  Indicator: {}
-                  Indicator Params: {}
-                  Timeframe: {}
-                  Compression: {}
-                """.format(
-                    symbol, name, params, tf, compression
-                )
-            )
-
-        ret_val = self.oapi.indicator_construct_and_send(
-            action="INDICATOR",
-            actionType="START",
-            symbol=symbol,
-            name=name,
-            linecount=linecount,
-            id=id,
-            params=params,
-            chartTF=tf,
-        )
-
-        # TODO error handling
-        # if ret_val.key["error"]:
-        #    print(ret_val)
-        #    raise ServerConfigError("error starting indicator")
-        #    self.put_notification(ret_val["description"])
-        #    return False
-        # else:
-        return ret_val
-
-    def indicator(
-        self, indicatorId, fromDate,
-    ):
-
-        if self.debug:
-            print(
-                "Timestamp: {}, Indicator Id: {}".format(
-                    datetime.utcfromtimestamp(float(fromDate)), id
-                )
-            )
-
-        data = self.oapi.indicator_construct_and_send(
-            action="INDICATOR",
-            actionType="REQUEST",
-            id=indicatorId,
-            fromDate=fromDate,
-            # indicatorId=indicatorId,
-        )
-
-        # TODO error handling
-        # if ret_val["error"]:
-        #    print(ret_val)
-        #    raise ServerConfigError("error starting indicator")
-        #    self.put_notification(ret_val["description"])
-        # else:
-        return data
-
-    def reset_server(self) -> None:
-        """Set server terminal symbol and time frame"""
-        ret_val = self.oapi.construct_and_send(action="RESET")
-
-        # TODO Error
-        # Error handling
-        if ret_val["error"]:
-            print(ret_val)
-            if ret_val["description"] == "Wrong symbol dosn't exist":
-                raise ServerConfigError("Symbol dosn't exist")
-            self.put_notification(ret_val["description"])
-
-    def write_csv(
-        self,
-        symbol: str,
-        timeframe: str,
-        compression: int = 1,
-        fromdate: datetime = None,
-        todate: datetime = None,
-    ) -> None:
-        """Request MT5 to write history data to CSV a file"""
-
-        if fromdate is None:
-            fromdate = float("-inf")
-        else:
-            fromdate = date2num(fromdate)
-
-        if todate is None:
-            todate = float("inf")
-        else:
-            todate = date2num(todate)
-
-        date_begin = num2date(fromdate) if fromdate > float("-inf") else None
-        date_end = num2date(todate) if todate < float("inf") else None
-
-        begin = end = None
-        if date_begin:
-            begin = int((date_begin - self._DTEPOCH).total_seconds())
-        if date_end:
-            end = int((date_end - self._DTEPOCH).total_seconds())
-
-        tf = self.get_granularity(timeframe, compression)
-
-        if self.debug:
-            print(
-                "Fetching: {}, Timeframe: {}, Fromdate: {}".format(
-                    symbol, tf, date_begin
-                )
-            )
-
-        ret_val = self.oapi.construct_and_send(
-            action="HISTORY",
-            actionType="WRITE",
-            symbol=symbol,
-            chartTF=tf,
-            fromDate=begin,
-            toDate=end,
-        )
-        # TODO Error
-        # Error handling
-        if ret_val["error"]:
-            if ret_val["description"] == "Wrong symbol dosn't exist":
-                raise ServerConfigError("Symbol dosn't exist")
-            self.put_notification(ret_val["description"])
-        else:
-            print(
-                f"Request to write CVS data for symbol {tf} and timeframe {tf} succeeded. Check MT5 EA logging for the exact output location ..."
-            )
-
         # TODO live updates
         # self.streaming_events()
 
@@ -875,19 +668,16 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
     def config_server(self, symbol: str, timeframe: str, compression: int) -> None:
         """Set server terminal symbol and time frame"""
-        conf = self.oapi.construct_and_send(
+        ret_val = self.oapi.construct_and_send(
             action="CONFIG",
             symbol=symbol,
             chartTF=self.get_granularity(timeframe, compression),
         )
 
-        # TODO Error
-        # Error handling
-        if conf["error"]:
-            print(conf)
-            if conf["description"] == "Wrong symbol dosn't exist":
-                raise ServerConfigError("Symbol dosn't exist")
-            self.put_notification(conf["description"])
+        if ret_val["error"]:
+            print(ret_val)
+            raise ServerConfigError(ret_val["description"])
+            self.put_notification(ret_val["description"])
 
     def check_account(self) -> None:
         """Get MetaTrader 5 account settings"""
@@ -996,3 +786,200 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             if request["type"].endswith("_SELL"):
                 size = -size
             self.broker._fill(oref, size, price, reason=request["type"])
+
+    def config_chart(self, chartId, dataname, timeframe, compression):
+        tf = self.get_granularity(timeframe, compression)
+        # Creating a chart with Ticks is not supported
+        if tf == "TICK":
+            raise ValueError(
+                "Metatrader 5 Charts don't support frame %s with \
+                compression %s"
+                % (bt.TimeFrame.getname(timeframe, compression), compression)
+            )
+        if self.debug:
+            print(
+                """
+                  Symbol: {}
+                  Timeframe: {}
+                  Compression: {}
+                """.format(
+                    dataname, tf, compression
+                )
+            )
+
+        ret_val = self.oapi.construct_and_send(
+            action="CHART",
+            actionType="OPEN",
+            chartId=chartId,
+            symbol=dataname,
+            chartTF=tf,
+        )
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise ChartError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+
+        return ret_val
+
+    def chart_add_indicator(
+        self, chartId, indicatorChartId, chartIndicatorSubWindow, style
+    ):
+
+        if self.debug:
+            print(
+                "Chart id: {}, IndicatorChartId: {}".format(chartId, indicatorChartId)
+            )
+
+        ret_val = self.oapi.construct_and_send(
+            action="CHART",
+            actionType="ADDINDICATOR",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            chartIndicatorSubWindow=chartIndicatorSubWindow,
+            style=style,
+        )
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise ChartError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+
+    def push_chart_data(self, chartId, indicatorChartId, data):
+        if self.debug:
+            print("Chart id: {}, Data: {}".format(chartId, data))
+
+        self.oapi.chart_data_construct_and_send(
+            action="DRAW",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            data=data,
+        )
+
+    def config_indicator(
+        self, symbol, timeframe, compression, name, id, params, linecount
+    ):
+        tf = self.get_granularity(timeframe, compression)
+        if tf == "TICK":
+            raise ValueError(
+                "Metatrader 5 Indicators don't support frame %s with \
+                compression %s"
+                % (bt.TimeFrame.getname(timeframe, compression), compression)
+            )
+        if self.debug:
+            print(
+                """
+                  Symbol: {}
+                  Indicator: {}
+                  Indicator Params: {}
+                  Timeframe: {}
+                  Compression: {}
+                """.format(
+                    symbol, name, params, tf, compression
+                )
+            )
+
+        ret_val = self.oapi.indicator_construct_and_send(
+            action="INDICATOR",
+            actionType="START",
+            symbol=symbol,
+            name=name,
+            linecount=linecount,
+            id=id,
+            params=params,
+            chartTF=tf,
+        )
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise IndicatorError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+
+        return ret_val
+
+    def indicator_data(
+        self, indicatorId, fromDate,
+    ):
+
+        if self.debug:
+            print(
+                "Timestamp: {}, Indicator Id: {}".format(
+                    datetime.utcfromtimestamp(float(fromDate)), id
+                )
+            )
+
+        ret_val = self.oapi.indicator_construct_and_send(
+            action="INDICATOR", actionType="REQUEST", id=indicatorId, fromDate=fromDate,
+        )
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise IndicatorError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+
+        return ret_val
+
+    def reset_server(self) -> None:
+        """Set server terminal symbol and time frame"""
+        ret_val = self.oapi.construct_and_send(action="RESET")
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise IndicatorError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+
+    def write_csv(
+        self,
+        symbol: str,
+        timeframe: str,
+        compression: int = 1,
+        fromdate: datetime = None,
+        todate: datetime = None,
+    ) -> None:
+        """Request MT5 to write history data to CSV a file"""
+
+        if fromdate is None:
+            fromdate = float("-inf")
+        else:
+            fromdate = date2num(fromdate)
+
+        if todate is None:
+            todate = float("inf")
+        else:
+            todate = date2num(todate)
+
+        date_begin = num2date(fromdate) if fromdate > float("-inf") else None
+        date_end = num2date(todate) if todate < float("inf") else None
+
+        begin = end = None
+        if date_begin:
+            begin = int((date_begin - self._DTEPOCH).total_seconds())
+        if date_end:
+            end = int((date_end - self._DTEPOCH).total_seconds())
+
+        tf = self.get_granularity(timeframe, compression)
+
+        if self.debug:
+            print(
+                "Fetching: {}, Timeframe: {}, Fromdate: {}".format(
+                    symbol, tf, date_begin
+                )
+            )
+
+        ret_val = self.oapi.construct_and_send(
+            action="HISTORY",
+            actionType="WRITE",
+            symbol=symbol,
+            chartTF=tf,
+            fromDate=begin,
+            toDate=end,
+        )
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise IndicatorError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+        else:
+            self.put_notification(
+                f"Request to write CVS data for symbol {tf} and timeframe {tf} succeeded. Check MT5 EA logging for the exact output location ..."
+            )

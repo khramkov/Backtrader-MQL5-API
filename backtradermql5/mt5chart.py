@@ -23,13 +23,6 @@ class MTraderChart(bt.Indicator):
             self.p.chartId, self.p.symbol, self.p.timeframe, self.p.compression,
         )
 
-        for name, obj in self.line_store.items():
-            self.p.store.chart_add_indicator_chart(
-                self.p.chartId, obj["chartIndicatorId"], obj["chartIndicatorSubWindow"]
-            )
-            if obj["chartIndicatorSubWindow"] > 0:
-                obj["chartIndicatorSubWindow"] += 1
-
     def next(self):
         state = self.p.data_obj._state
         qsize = self.p.data_obj._historyback_queue_size
@@ -42,10 +35,9 @@ class MTraderChart(bt.Indicator):
             #     self.p.chartId, obj["chartIndicatorId"], [obj["line"][0]], date
             # )
 
-            # if obj["line"]._minperiod < len(obj["line"]):
             date = self.p.data_obj.datetime.datetime()  # .timestamp())
             value = obj["line"][0]
-            # TODO send on which states?
+
             # if len(obj["values"]) > len(obj["values"]) - 20:
             # if str(date) == "2020-02-21 22:53:00":
             # if state == 2:  # or state == 3:  # or state == 4:
@@ -53,7 +45,7 @@ class MTraderChart(bt.Indicator):
             if date != self.last_date:
                 if qsize <= 1 or state == _ST_LIVE:
                     obj["values"].append(value)
-                    self.p.store.chart(
+                    self.p.store.push_chart_data(
                         self.p.chartId, obj["chartIndicatorId"], obj["values"]
                     )
                     obj["values"] = []
@@ -87,7 +79,7 @@ class MTraderChart(bt.Indicator):
             "style": style,
             "values": [],
         }
-        self.p.store.chart_add_indicator_chart(
+        self.p.store.chart_add_indicator(
             self.p.chartId, chartIndicatorId, chartIndicatorSubWindow, style
         )
 

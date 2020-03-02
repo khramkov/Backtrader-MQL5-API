@@ -1,5 +1,4 @@
 from backtrader import bt
-
 import uuid
 
 
@@ -18,7 +17,7 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
         params = params
 
         def __init__(self):
-
+            self.last_fromDate = 0
             self.p.timeframe = self.data_obj._timeframe
             self.p.compression = self.data_obj._compression
             self.p.indicator = self.p.indicator
@@ -26,6 +25,7 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
             self.p.id = str(uuid.uuid4())
             self.p.symbol = self.data_obj._name
             self.p.linecount = len(lines)
+
             ret_val = self.mtstore.config_indicator(
                 self.p.symbol,
                 self.p.timeframe,
@@ -41,13 +41,14 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
         def next(self):
             fromDate = int(self.data_obj.datetime.datetime().timestamp())
 
-            ret_val = self.mtstore.indicator(self.p.indicatorId, fromDate)
+            if fromDate != self.last_fromDate:
+                ret_val = self.mtstore.indicator_data(self.p.indicatorId, fromDate)
+                self.last_fromDate = fromDate
 
-            # TODO error handling
-            i = 0
-            for d in ret_val["data"]:
-                self.lines[i][0] = float(ret_val["data"][i])
-                i += 1
+                i = 0
+                for d in ret_val["data"]:
+                    self.lines[i][0] = float(ret_val["data"][i])
+                    i += 1
 
     setAttributes()
 
