@@ -166,6 +166,8 @@ class MTraderAPI:
     def _push_chart_data(self, data: dict) -> None:
         """Send message for chart control to server via ZeroMQ chart data socket"""
         try:
+            if self.debug:
+                print("ZMQ PUSH CHART DATA: ", data, " -> ", data)
             self.chart_data_socket.send_json(data)
         except zmq.ZMQError:
             raise zmq.NotDone("Sending request ERROR")
@@ -796,16 +798,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 compression %s"
                 % (bt.TimeFrame.getname(timeframe, compression), compression)
             )
-        if self.debug:
-            print(
-                """
-                  Symbol: {}
-                  Timeframe: {}
-                  Compression: {}
-                """.format(
-                    dataname, tf, compression
-                )
-            )
 
         ret_val = self.oapi.construct_and_send(
             action="CHART",
@@ -825,12 +817,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def chart_add_indicator(
         self, chartId, indicatorChartId, chartIndicatorSubWindow, style
     ):
-
-        if self.debug:
-            print(
-                "Chart id: {}, IndicatorChartId: {}".format(chartId, indicatorChartId)
-            )
-
         ret_val = self.oapi.construct_and_send(
             action="CHART",
             actionType="ADDINDICATOR",
@@ -846,9 +832,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self.put_notification(ret_val["description"])
 
     def push_chart_data(self, chartId, indicatorChartId, data):
-        if self.debug:
-            print("Chart id: {}, Data: {}".format(chartId, data))
-
         self.oapi.chart_data_construct_and_send(
             action="DRAW",
             chartId=chartId,
@@ -865,18 +848,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 "Metatrader 5 Indicators don't support frame %s with \
                 compression %s"
                 % (bt.TimeFrame.getname(timeframe, compression), compression)
-            )
-        if self.debug:
-            print(
-                """
-                  Symbol: {}
-                  Indicator: {}
-                  Indicator Params: {}
-                  Timeframe: {}
-                  Compression: {}
-                """.format(
-                    symbol, name, params, tf, compression
-                )
             )
 
         ret_val = self.oapi.indicator_construct_and_send(
@@ -903,7 +874,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         if self.debug:
             print(
-                "Timestamp: {}, Indicator Id: {}".format(
+                "Req. indicator data with Timestamp: {}, Indicator Id: {}".format(
                     datetime.utcfromtimestamp(float(fromDate)), id
                 )
             )
