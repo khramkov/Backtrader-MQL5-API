@@ -30,12 +30,8 @@ class MTraderChart(bt.Indicator):
         _ST_HISTORBACK = self.p.data_obj._ST_HISTORBACK
 
         for name, obj in self.line_store.items():
-            # date = self.p.data_obj.datetime.datetime()  # .timestamp())
-            # self.p.store.chart(
-            #     self.p.chartId, obj["chartIndicatorId"], [obj["line"][0]], date
-            # )
 
-            date = self.p.data_obj.datetime.datetime()  # .timestamp())
+            date = self.p.data_obj.datetime.datetime()
             value = obj["line"][0]
 
             # if len(obj["values"]) > len(obj["values"]) - 20:

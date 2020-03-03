@@ -932,7 +932,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         if self.debug:
             print(
-                "Fetching: {}, Timeframe: {}, Fromdate: {}".format(
+                "Request CSV write with Fetching: {}, Timeframe: {}, Fromdate: {}".format(
                     symbol, tf, date_begin
                 )
             )
