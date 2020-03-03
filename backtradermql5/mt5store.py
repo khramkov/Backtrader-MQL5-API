@@ -896,7 +896,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         if ret_val["error"]:
             print(ret_val)
-            raise IndicatorError(ret_val["description"])
+            raise ServerConfigError(ret_val["description"])
             self.put_notification(ret_val["description"])
 
     def write_csv(
@@ -948,7 +948,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         if ret_val["error"]:
             print(ret_val)
-            raise IndicatorError(ret_val["description"])
+            raise ServerConfigError(ret_val["description"])
             self.put_notification(ret_val["description"])
         else:
             self.put_notification(
