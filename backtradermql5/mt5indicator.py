@@ -25,6 +25,7 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
             self.p.id = str(uuid.uuid4())
             self.p.symbol = self.data_obj._name
             self.p.linecount = len(lines)
+            self.p.params = [str(x) for x in self.p.params]
 
             ret_val = self.mtstore.config_indicator(
                 self.p.symbol,
