@@ -46,7 +46,7 @@ class StreamError(MTraderError):
 
 class IndicatorError(MTraderError):
     def __init__(self, *args, **kwargs):
-        super(self.IndicatorError, self).__init__(*args, **kwargs)
+        super(self.__class__, self).__init__(*args, **kwargs)
 
 
 class ChartError(MTraderError):
@@ -790,6 +790,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self.broker._fill(oref, size, price, reason=request["type"])
 
     def config_chart(self, chartId, dataname, timeframe, compression):
+        """Opens a chart window in MT5"""
+
         tf = self.get_granularity(timeframe, compression)
         # Creating a chart with Ticks is not supported
         if tf == "TICK":
@@ -817,6 +819,37 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def chart_add_indicator(
         self, chartId, indicatorChartId, chartIndicatorSubWindow, style
     ):
+        """Attaches the JsonAPIIndicator to the specified chart window"""
+
+        ret_val = self.oapi.construct_and_send(
+            action="CHART",
+            actionType="ADDINDICATOR",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            chartIndicatorSubWindow=chartIndicatorSubWindow,
+            style=style,
+        )
+
+        if ret_val["error"]:
+            print(ret_val)
+            raise ChartError(ret_val["description"])
+            self.put_notification(ret_val["description"])
+
+    def push_chart_data(self, chartId, indicatorChartId, data):
+        """Pushes backtrader indicator values to be distributed to be drawn by JsonAPIIndicator instances"""
+
+        self.oapi.chart_data_construct_and_send(
+            action="DRAW",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            data=data,
+        )
+
+    def chart_add_graphic(
+        self, chartId, indicatorChartId, chartIndicatorSubWindow, style
+    ):
+        """Add graphical objects to a chart window"""
+
         ret_val = self.oapi.construct_and_send(
             action="CHART",
             actionType="ADDINDICATOR",
@@ -842,6 +875,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def config_indicator(
         self, symbol, timeframe, compression, name, id, params, linecount
     ):
+        """Instantiates an indicator in MT5"""
+
         tf = self.get_granularity(timeframe, compression)
         if tf == "TICK":
             raise ValueError(
@@ -871,6 +906,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def indicator_data(
         self, indicatorId, fromDate,
     ):
+        """Recieves values from a MT5 indicator instance"""
 
         if self.debug:
             print(
@@ -887,11 +923,16 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             print(ret_val)
             raise IndicatorError(ret_val["description"])
             self.put_notification(ret_val["description"])
+            if ret_val["lastError"] == "4806":
+                self.put_notification(
+                    "You have probably requested too many lines (MT5 indicator buffers)."
+                )
 
         return ret_val
 
     def reset_server(self) -> None:
-        """Set server terminal symbol and time frame"""
+        """Removes all symbol subscritions and clears all indicators"""
+
         ret_val = self.oapi.construct_and_send(action="RESET")
 
         if ret_val["error"]:
