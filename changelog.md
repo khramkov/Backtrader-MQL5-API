@@ -1,3 +1,9 @@
+### 30th April 2020
+
+- add support for spreads
+- add support for drawing backtrader indicator output to MT5 charts
+- add support for accessing MT5 indicator calculations in backtrader
+
 ### 16th February 2020
 
 - add support for candle ask/bid price spread
