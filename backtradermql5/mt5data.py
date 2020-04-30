@@ -56,12 +56,12 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         Reconnect when network connection is down
 
       - `useask` (default: `False`)
-        
+
         When requsting tick data use the ask price instead of the default bid price.
         Only works with tick data.
-        
+
       - `addspread` (default: `False`)
-        
+
         Add spread difference to candle price data.
         Only works with candle data.
 
@@ -91,10 +91,6 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def __init__(self, **kwargs):
         self.o = self._store(**kwargs)
-        # self._candleFormat = 'bidask' if self.p.bidask else 'midpoint'
-        # self.symbol = self.p.dataname
-        # self.timeframe = self.p.timeframe
-        # self.compression = self.p.compression
 
     def setenvironment(self, env):
         """Receives an environment (cerebro) and passes it over to the store it
@@ -116,7 +112,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.o.start(data=self)
 
         # Add server script symbol and time frame
-        self.o.config_server(self.p.dataname, self.p.timeframe, self.p.compression)
+        self.o.config_server(
+            self.p.dataname, self.p.timeframe, self.p.compression)
 
         # Backfill from external data feed
         if self.p.backfill_from is not None:
@@ -131,8 +128,10 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     def _st_start(self):
         self.put_notification(self.DELAYED)
 
-        date_begin = num2date(self.fromdate) if self.fromdate > float("-inf") else None
-        date_end = num2date(self.todate) if self.todate < float("inf") else None
+        date_begin = num2date(
+            self.fromdate) if self.fromdate > float("-inf") else None
+        date_end = num2date(
+            self.todate) if self.todate < float("inf") else None
 
         self.qhist = self.o.price_data(
             self.p.dataname,
@@ -295,7 +294,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.lines.high[0] = (
             _high if not self.p.addspread else addspread(_high, _spread)
         )
-        self.lines.low[0] = _low if not self.p.addspread else addspread(_low, _spread)
+        self.lines.low[0] = _low if not self.p.addspread else addspread(
+            _low, _spread)
         self.lines.close[0] = (
             _close if not self.p.addspread else addspread(_close, _spread)
         )

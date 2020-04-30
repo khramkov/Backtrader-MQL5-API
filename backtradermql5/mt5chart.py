@@ -5,7 +5,8 @@ import uuid
 
 class MTraderChart(bt.Indicator):
 
-    lines = ("dummyline",)  # Inherited Indicator class requires at least one line
+    # Inherited Indicator class requires at least one line
+    lines = ("dummyline",)
     params = (("data_obj", None),)
 
     line_store = list()
@@ -32,9 +33,6 @@ class MTraderChart(bt.Indicator):
         for obj in self.line_store:
             date = self.p.data_obj.datetime.datetime()
             value = obj["line"][0]
-            # if len(obj["values"]) > len(obj["values"]) - 20:
-            # if str(date) == "2020-02-21 22:53:00":
-            # if state == 2:  # or state == 3:  # or state == 4:
             if date != self.last_date:
                 obj["values"].append(value)
                 # Push historical indicator values when all historical price data has been processed

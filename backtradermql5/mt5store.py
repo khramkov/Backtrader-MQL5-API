@@ -64,7 +64,6 @@ class MTraderAPI:
 
     def __init__(self, *args, **kwargs):
 
-        # self.LOCAL_HOST = '*'
         self.HOST = kwargs["host"]
         self.SYS_PORT = 15555  # REP/REQ port
         self.DATA_PORT = 15556  # PUSH/PULL port
@@ -86,12 +85,14 @@ class MTraderAPI:
             self.sys_socket = context.socket(zmq.REQ)
             # set port timeout
             self.sys_socket.RCVTIMEO = sys_timeout * 1000
-            self.sys_socket.connect("tcp://{}:{}".format(self.HOST, self.SYS_PORT))
+            self.sys_socket.connect(
+                "tcp://{}:{}".format(self.HOST, self.SYS_PORT))
 
             self.data_socket = context.socket(zmq.PULL)
             # set port timeout
             self.data_socket.RCVTIMEO = data_timeout * 1000
-            self.data_socket.connect("tcp://{}:{}".format(self.HOST, self.DATA_PORT))
+            self.data_socket.connect(
+                "tcp://{}:{}".format(self.HOST, self.DATA_PORT))
 
             self.indicator_data_socket = context.socket(zmq.PULL)
             # set port timeout
@@ -275,7 +276,8 @@ class MetaSingleton(MetaParams):
 
     def __call__(cls, *args, **kwargs):
         if cls._singleton is None:
-            cls._singleton = super(MetaSingleton, cls).__call__(*args, **kwargs)
+            cls._singleton = super(
+                MetaSingleton, cls).__call__(*args, **kwargs)
 
         return cls._singleton
 
@@ -604,7 +606,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 else:
                     self.cancel_order(oid, symbol)
             except Exception as e:
-                self.put_notification("Order not cancelled: {}, {}".format(oid, e))
+                self.put_notification(
+                    "Order not cancelled: {}, {}".format(oid, e))
                 continue
 
             self._cancel_flag = True
