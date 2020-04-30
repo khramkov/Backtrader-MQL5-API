@@ -14,12 +14,13 @@ class MTraderChart(bt.Indicator):
     # graphic_types = ["curve", "line", "arrowbuy", "arrowsell"]
 
     def __init__(self):
-        self.last_date = 0
+        # self.last_date = 0
         self.p.chartId = str(uuid.uuid4())
         self.p.symbol = self.p.data_obj._name
         self.p.timeframe = self.p.data_obj._timeframe
         self.p.compression = self.p.data_obj._compression
         self.p.store = self.p.data_obj.o
+        # self.datas0 = self.p.data_obj
 
         self.p.store.config_chart(
             self.p.chartId, self.p.symbol, self.p.timeframe, self.p.compression,
@@ -31,9 +32,10 @@ class MTraderChart(bt.Indicator):
         _ST_LIVE = self.p.data_obj._ST_LIVE
 
         for obj in self.line_store:
+            print('------------------------', obj['style']['shortname'])
             date = self.p.data_obj.datetime.datetime()
             value = obj["line"][0]
-            if date != self.last_date and not math.isnan(value):
+            if date != obj["last_date"] and not math.isnan(value):
                 obj["values"].append(value)
                 # Push historical indicator values when all historical price data has been processed
                 if qsize <= 1 or state == _ST_LIVE:
@@ -41,7 +43,7 @@ class MTraderChart(bt.Indicator):
                         self.p.chartId, obj["chartIndicatorId"], obj["values"]
                     )
                     obj["values"] = []
-                self.last_date = date
+                obj["last_date"] = date
 
     def addobject(self):
         pass
@@ -61,6 +63,7 @@ class MTraderChart(bt.Indicator):
         chartIndicatorSubWindow = 1
         self.line_store.append(
             {
+                "last_date": 0,
                 "line": line,
                 "chartIndicatorId": chartIndicatorId,
                 "chartIndicatorSubWindow": chartIndicatorSubWindow,
