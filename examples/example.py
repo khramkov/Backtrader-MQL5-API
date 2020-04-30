@@ -41,7 +41,7 @@ class SmaCross(bt.SignalStrategy):
 
         # Draw the SMA indicator to a chart instance in MT5.
         chart.addline(self.sma,
-                      style={'shortname': 'v1', 'color': 'clrBlue'})
+                      style={'shortname': 'BT-SMA', 'color': 'clrBlue'})
 
     def next(self):
         if self.buy_order is None:
@@ -77,8 +77,10 @@ class SmaCross(bt.SignalStrategy):
             self.live_data = False
 
 
+host = '192.168.1.83'
+
 cerebro = bt.Cerebro()
-store = MTraderStore(host=HOST, debug=True, datatimeout=10)
+store = MTraderStore(host=host, debug=True, datatimeout=10)
 cerebro.addstrategy(SmaCross, store)
 
 # uncomment next 2 lines to use backbroker for live trading with MTraderStore
