@@ -1,5 +1,5 @@
 from backtrader import bt
-
+import math
 import uuid
 
 
@@ -33,7 +33,7 @@ class MTraderChart(bt.Indicator):
         for obj in self.line_store:
             date = self.p.data_obj.datetime.datetime()
             value = obj["line"][0]
-            if date != self.last_date:
+            if date != self.last_date and not math.isnan(value):
                 obj["values"].append(value)
                 # Push historical indicator values when all historical price data has been processed
                 if qsize <= 1 or state == _ST_LIVE:

@@ -1,3 +1,4 @@
+import pytz
 import backtrader as bt
 import backtrader.indicators as btind
 from backtradermql5.mt5store import MTraderStore
@@ -11,26 +12,36 @@ HOST = '192.168.1.83'
 class SmaCross(bt.SignalStrategy):
 
     def __init__(self, store):
-        # self.mt = dict()
         self.buy_order = None
         self.live_data = False
 
         # You can hookup backtrader to any indicator that runs in MT5
         # Startup and retrieve values from the MT5 indicator "Examples/Envelopes"
-        self.mt5sma = getMTraderIndicator(
-            store,  # MTraderStorestore instance
-            self.datas[0],  # Data stream to run the indicator calculations on
-            ("val1",),  # Set accessor(s) for the indicator output
-            indicator="Examples/Envelopes",  # MT5 inidicator name
-            params=[14, 0, 'MODE_SMA'])()  # indicator parameters
+        self.mt5macd = getMTraderIndicator(
+            # MTraderStorestore instance
+            store,
+            # Data stream to run the indicator calculations on
+            self.datas[0],
+            # Set accessor(s) for the indicator output
+            ("val1", "val2",),
+            # MT5 inidicator name
+            indicator="Examples/MACD",
+            # Indicator parameters.
+            # Any omitted values will use the defaults as defind by the indicator
+            params=[12, 26, 9, 'PRICE_CLOSE']
+        )()
 
+        # Attach any inidcator to be drawn to a chart window before instantiating the MTraderChart class.
         self.sma = btind.SimpleMovingAverage(self.data)
 
-        # Open a chart window in MT5 with the symbol and timeframe provided by the passed data object.
+        # Open a new chart window in MT5 with symbol and timeframe provided by the passed data stream object.
+        # Important: create a new chart instance only after you attached any
+        # indicator you want to draw to avoid errors.
         chart = MTraderChart(data_obj=self.datas[0])
 
-        chart.addline(self.mt[self.datas[0]._name].val1,
-                      style={'shortname': 'myIndi', 'color': 'clrBlue'})
+        # Draw the SMA indicator to a chart instance in MT5.
+        chart.addline(self.sma,
+                      style={'shortname': 'v1', 'color': 'clrBlue'})
 
     def next(self):
         if self.buy_order is None:
@@ -52,7 +63,8 @@ class SmaCross(bt.SignalStrategy):
         for data in self.datas:
             print(
                 f'{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]}')
-            print(f'Examples/Envelopes {self.mt5sma.val1[0]}')
+            print(
+                f'Examples/Envelopes {self.mt5macd.val1[0]} {self.mt5macd.val2[0]}')
 
     def notify_data(self, data, status, *args, **kwargs):
         dn = data._name
@@ -69,23 +81,22 @@ cerebro = bt.Cerebro()
 store = MTraderStore(host=HOST, debug=True, datatimeout=10)
 cerebro.addstrategy(SmaCross, store)
 
-# comment next 2 lines to use backbroker for backtesting with MTraderStore
+# uncomment next 2 lines to use backbroker for live trading with MTraderStore
 # broker = store.getbroker(use_positions=True)
 # cerebro.setbroker(broker)
 
-start_date = datetime.now() - timedelta(minutes=500)
+start_date = datetime.now() - timedelta(minutes=200)
 
-data = store.getdata(
-    dataname='EURUSD',
-    timeframe=bt.TimeFrame.Ticks,
-    fromdate=start_date,
-    # useask=True,  # ask price instead if the default bid price
-    # historical=True
-)
-
-cerebro.resampledata(data,
+data = store.getdata(dataname='EURUSD',
                      timeframe=bt.TimeFrame.Minutes,
-                     compression=1
+                     fromdate=start_date,
+                     compression=5,
+                     tz=pytz.timezone('Europe/Berlin'),
+                     # useask=True, # ask price instead if the default bid price
+                     # addspread=True, # add the spread value
+                     historical=True
                      )
+
+cerebro.adddata(data)
 
 cerebro.run(stdstats=False)

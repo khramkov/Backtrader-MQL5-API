@@ -867,14 +867,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             raise ChartError(ret_val["description"])
             self.put_notification(ret_val["description"])
 
-    def push_chart_data(self, chartId, indicatorChartId, data):
-        self.oapi.chart_data_construct_and_send(
-            action="DRAW",
-            chartId=chartId,
-            indicatorChartId=indicatorChartId,
-            data=data,
-        )
-
     def config_indicator(
         self, symbol, timeframe, compression, name, id, params, linecount
     ):
