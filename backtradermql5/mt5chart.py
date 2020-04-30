@@ -14,13 +14,11 @@ class MTraderChart(bt.Indicator):
     # graphic_types = ["curve", "line", "arrowbuy", "arrowsell"]
 
     def __init__(self):
-        # self.last_date = 0
         self.p.chartId = str(uuid.uuid4())
         self.p.symbol = self.p.data_obj._name
         self.p.timeframe = self.p.data_obj._timeframe
         self.p.compression = self.p.data_obj._compression
         self.p.store = self.p.data_obj.o
-        # self.datas0 = self.p.data_obj
 
         self.p.store.config_chart(
             self.p.chartId, self.p.symbol, self.p.timeframe, self.p.compression,
@@ -32,7 +30,6 @@ class MTraderChart(bt.Indicator):
         _ST_LIVE = self.p.data_obj._ST_LIVE
 
         for obj in self.line_store:
-            print('------------------------', obj['style']['shortname'])
             date = self.p.data_obj.datetime.datetime()
             value = obj["line"][0]
             if date != obj["last_date"] and not math.isnan(value):
@@ -45,11 +42,7 @@ class MTraderChart(bt.Indicator):
                     obj["values"] = []
                 obj["last_date"] = date
 
-    def addobject(self):
-        pass
-
     def addline(self, line, *args, **kwargs):
-
         style = {
             "shortname": "JsonAPI",
             "color": "clrBlue",
