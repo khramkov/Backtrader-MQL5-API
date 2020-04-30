@@ -84,7 +84,7 @@ class SmaCross(bt.SignalStrategy):
 host = "192.168.1.83"
 
 cerebro = bt.Cerebro()
-store = MTraderStore(host=host, debug=True, datatimeout=10)
+store = MTraderStore(host=host, debug=False, datatimeout=10)
 cerebro.addstrategy(SmaCross, store)
 
 # uncomment next 2 lines to use backbroker for live trading with MTraderStore

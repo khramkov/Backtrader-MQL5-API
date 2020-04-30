@@ -75,7 +75,7 @@ class MTraderAPI:
 
         # ZeroMQ timeout in seconds
         sys_timeout = 1
-        data_timeout = self.debug = kwargs["datatimeout"]
+        data_timeout = kwargs["datatimeout"]
 
         # initialise ZMQ context
         context = zmq.Context()
@@ -115,6 +115,7 @@ class MTraderAPI:
         try:
             self.sys_socket.send_json(data)
             msg = self.sys_socket.recv_string()
+
             if self.debug:
                 print("ZMQ SYS REQUEST: ", data, " -> ", msg)
             # terminal received the request
