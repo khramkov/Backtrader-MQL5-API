@@ -45,6 +45,7 @@ class MTraderChart(bt.Indicator):
     def addline(self, line, *args, **kwargs):
         style = {
             "shortname": "JsonAPI",
+            "linelabel": "Value",
             "color": "clrBlue",
             "linetype": "DRAW_LINE",
             "linestyle": "STYLE_SOLID",

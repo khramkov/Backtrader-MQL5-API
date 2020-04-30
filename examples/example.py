@@ -20,7 +20,7 @@ class SmaCross(bt.SignalStrategy):
             # Data stream to run the indicator calculations on
             self.datas[0],
             # Set accessor(s) for the indicator output
-            ("val1", "val2",),
+            ("macd", "signal",),
             # MT5 inidicator name
             indicator="Examples/MACD",
             # Indicator parameters.
@@ -29,16 +29,21 @@ class SmaCross(bt.SignalStrategy):
         )()
 
         # Attach any inidcator to be drawn to a chart window _before_ instantiating the MTraderChart class.
-        self.sma = btind.SimpleMovingAverage(self.data)
+        # self.sma = btind.SimpleMovingAverage(self.data)
+        self.bb = btind.BollingerBands(self.data)
 
         # Open a new chart window in MT5 with symbol and timeframe provided by the passed data stream object.
         # Important: instantiate new chart MTraderChart only after you attached any
         # indicator you want to draw. Otherwise it will fail!
         chart = MTraderChart(data_obj=self.datas[0])
 
-        # Draw the backtrader SMA indicator to a chart window in MT5.
-        chart.addline(self.sma, style={
-                      "shortname": "BT-SMA", "color": "clrBlue"})
+        # Plot the backtrader BollingerBand indicator to a chart window in MT5.
+        chart.addline(self.bb.top, style={
+                      "shortname": "BT-BollingerBands", "linelabel": "Top", "color": "clrBlue"})
+        chart.addline(self.bb.mid, style={
+                      "shortname": "BT-BollingerBands", "linelabel": "Middle", "color": "clrYellow"})
+        chart.addline(self.bb.bot, style={
+                      "shortname": "BT-BollingerBands", "linelabel": "Bottom", "color": "clrGreen"})
 
     def next(self):
         if self.buy_order is None:
@@ -63,7 +68,7 @@ class SmaCross(bt.SignalStrategy):
                 f"{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]}"
             )
             print(
-                f"MT5 indicator Examples/MACD: {self.mt5macd.val1[0]} {self.mt5macd.val2[0]}")
+                f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}")
 
     def notify_data(self, data, status, *args, **kwargs):
         dn = data._name
@@ -92,7 +97,7 @@ data = store.getdata(
     dataname="EURUSD",
     timeframe=bt.TimeFrame.Minutes,
     fromdate=start_date,
-    compression=5,
+    compression=1,
     # You need to provide the correct time zone for drawing indicators to charts widows in MT5 to work properly
     tz=pytz.timezone("Europe/Berlin"),
     # useask=True, # Ask price instead if the default bid price
