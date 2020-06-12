@@ -149,6 +149,48 @@ data2 = store.getdata(dataname='EURUSD',
 cerebro.run(stdstats=False)
 ```
 
+### Using MT5 Indicators and drawing to MT5 charts
+
+#### MT5 Inidcators
+
+You can use any MT5 indicator directly from Backtrader via the `MTraderIndicator` class.
+
+```
+    def __init__(self, store):
+        self.mt5macd = getMTraderIndicator(
+            # MTraderStorestore instance
+            store,
+            # Data stream to run the indicator calculations on
+            self.datas[0],
+            # Set accessor(s) for the indicator output
+            ("macd", "signal",),
+            # MT5 inidicator name
+            indicator="Examples/MACD",
+            # Indicator parameters.
+            # Any omitted values will use the defaults as defind by the indicator
+            params=[12, 26, 9, "PRICE_CLOSE"],
+        )()
+
+    def next(self):
+        print(f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}")
+```
+
+For a fully working example of a Strategy refer to `example.py`.
+
+#### Drawing to charts
+
+You can open and draw directly to a chart in MT5 vial the `MTraderChart` class.
+
+```
+    def __init__(self, store):
+        chart = MTraderChart(data_obj=self.datas[0])
+        self.bb = btind.BollingerBands(self.data)
+        chart.addline(self.bb.top, style={
+                      "shortname": "BT-BollingerBands", "linelabel": "Top", "color": "clrBlue"})
+```
+
+For a fully working example of a Strategy refer to `example.py`.
+
 ## License
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
