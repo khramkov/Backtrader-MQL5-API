@@ -41,8 +41,7 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
             fromDate = int(self.data_obj.datetime.datetime().timestamp())
 
             if fromDate != self.last_fromDate:
-                ret_val = self.mtstore.indicator_data(
-                    self.p.indicatorId, fromDate)
+                ret_val = self.mtstore.indicator_data(self.p.indicatorId, fromDate)
                 self.last_fromDate = fromDate
 
                 for i in range(len(ret_val["data"])):

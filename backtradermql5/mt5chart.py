@@ -54,7 +54,10 @@ class MTraderChart(bt.Indicator):
         style.update(**kwargs["style"])
 
         chartIndicatorId = str(uuid.uuid4())
-        chartIndicatorSubWindow = 1
+        if "window" in kwargs:
+            chartIndicatorSubWindow = kwargs["window"]
+        else:
+            chartIndicatorSubWindow = 0
         self.line_store.append(
             {
                 "last_date": 0,

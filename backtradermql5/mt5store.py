@@ -194,8 +194,6 @@ class MTraderAPI:
             "expiration": None,
             "deviation": None,
             "comment": None,
-            "indicatorName": None,
-            "indicatorParams": None,
             "chartId": None,
             "indicatorChartId": None,
             "chartIndicatorSubWindow": None,
@@ -843,7 +841,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         """Pushes backtrader indicator values to be distributed to be drawn by JsonAPIIndicator instances"""
 
         self.oapi.chart_data_construct_and_send(
-            action="DRAW",
+            action="PLOT",
             chartId=chartId,
             indicatorChartId=indicatorChartId,
             data=data,
@@ -883,7 +881,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         ret_val = self.oapi.indicator_construct_and_send(
             action="INDICATOR",
-            actionType="START",
+            actionType="ATTACH",
             symbol=symbol,
             name=name,
             linecount=linecount,

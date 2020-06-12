@@ -13,13 +13,13 @@ class SmaCross(bt.SignalStrategy):
         self.live_data = False
 
         # You can hookup backtrader to any indicator that runs in MT5
-        # Startup and retrieve values from the MT5 indicator "Examples/MACD"
+        # Attach and retrieve values from the MT5 indicator "Examples/MACD"
         self.mt5macd = getMTraderIndicator(
             # MTraderStorestore instance
             store,
             # Data stream to run the indicator calculations on
             self.datas[0],
-            # Set accessor(s) for the indicator output
+            # Set accessor(s) for the indicator output buffers
             ("macd", "signal",),
             # MT5 inidicator name
             indicator="Examples/MACD",
@@ -33,17 +33,35 @@ class SmaCross(bt.SignalStrategy):
         self.bb = btind.BollingerBands(self.data)
 
         # Open a new chart window in MT5 with symbol and timeframe provided by the passed data stream object.
-        # Important: instantiate new chart MTraderChart only after you attached any
-        # indicator you want to draw. Otherwise it will fail!
+        # Important: instantiate a new chart with class MTraderChart only after you attached any
+        # indicator you want to plot by calling getMTraderIndicator as shown on line 17 above. Otherwise it will fail!
         chart = MTraderChart(data_obj=self.datas[0])
 
         # Plot the backtrader BollingerBand indicator to a chart window in MT5.
-        chart.addline(self.bb.top, style={
-                      "shortname": "BT-BollingerBands", "linelabel": "Top", "color": "clrBlue"})
-        chart.addline(self.bb.mid, style={
-                      "shortname": "BT-BollingerBands", "linelabel": "Middle", "color": "clrYellow"})
-        chart.addline(self.bb.bot, style={
-                      "shortname": "BT-BollingerBands", "linelabel": "Bottom", "color": "clrGreen"})
+        chart.addline(
+            self.bb.top,
+            style={
+                "shortname": "BT-BollingerBands",
+                "linelabel": "Top",
+                "color": "clrBlue",
+            },
+        )
+        chart.addline(
+            self.bb.mid,
+            style={
+                "shortname": "BT-BollingerBands",
+                "linelabel": "Middle",
+                "color": "clrYellow",
+            },
+        )
+        chart.addline(
+            self.bb.bot,
+            style={
+                "shortname": "BT-BollingerBands",
+                "linelabel": "Bottom",
+                "color": "clrGreen",
+            },
+        )
 
     def next(self):
         if self.buy_order is None:
@@ -68,7 +86,8 @@ class SmaCross(bt.SignalStrategy):
                 f"{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]}"
             )
             print(
-                f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}")
+                f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}"
+            )
 
     def notify_data(self, data, status, *args, **kwargs):
         dn = data._name
@@ -81,7 +100,7 @@ class SmaCross(bt.SignalStrategy):
             self.live_data = False
 
 
-host = "192.168.1.83"
+host = "192.168.1.101"
 
 cerebro = bt.Cerebro()
 store = MTraderStore(host=host, debug=False, datatimeout=10)
