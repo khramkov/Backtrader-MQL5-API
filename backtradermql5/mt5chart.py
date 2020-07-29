@@ -10,6 +10,8 @@ class MTraderChart(bt.Indicator):
     params = (("data_obj", None),)
 
     line_store = list()
+    indicator_buffers = dict()
+    subwindow_count = 0
     # TODO implent drawing of chart objects
     # graphic_types = ["curve", "line", "arrowbuy", "arrowsell"]
 
@@ -37,12 +39,23 @@ class MTraderChart(bt.Indicator):
                 # Push historical indicator values when all historical price data has been processed
                 if qsize <= 1 or state == _ST_LIVE:
                     self.p.store.push_chart_data(
-                        self.p.chartId, obj["chartIndicatorId"], obj["values"]
+                        self.p.chartId, obj["chartIndicatorId"], obj["bufferId"], obj["values"],
                     )
                     obj["values"] = []
                 obj["last_date"] = date
 
-    def addline(self, line, *args, **kwargs):
+    def addindicator(self, subwindow):
+        if subwindow > self.subwindow_count:
+            self.subwindow_count += 1
+            subwindow = self.subwindow_count
+
+        chartIndicatorId = str(uuid.uuid4())
+        # TODO add shortname support
+        self.p.store.chart_add_indicator(self.p.chartId, chartIndicatorId, subwindow)
+        self.indicator_buffers[chartIndicatorId] = 0
+        return chartIndicatorId
+
+    def addbuffer(self, line, *args, **kwargs):
         style = {
             "shortname": "JsonAPI",
             "linelabel": "Value",
@@ -52,22 +65,10 @@ class MTraderChart(bt.Indicator):
             "linewidth": 1,
         }
         style.update(**kwargs["style"])
-
-        chartIndicatorId = str(uuid.uuid4())
-        if "window" in kwargs:
-            chartIndicatorSubWindow = kwargs["window"]
-        else:
-            chartIndicatorSubWindow = 0
+        chartIndicatorId = kwargs["indicator"]
         self.line_store.append(
-            {
-                "last_date": 0,
-                "line": line,
-                "chartIndicatorId": chartIndicatorId,
-                "chartIndicatorSubWindow": chartIndicatorSubWindow,
-                "style": style,
-                "values": [],
-            }
+            {"last_date": 0, "line": line, "chartIndicatorId": chartIndicatorId, "style": style, "values": [], "bufferId": self.indicator_buffers[chartIndicatorId],}
         )
-        self.p.store.chart_add_indicator(
-            self.p.chartId, chartIndicatorId, chartIndicatorSubWindow, style
-        )
+        self.p.store.chart_indicator_add_buffer(self.p.chartId, chartIndicatorId, style)
+        self.indicator_buffers[chartIndicatorId] += 1
+

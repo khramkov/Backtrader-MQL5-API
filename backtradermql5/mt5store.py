@@ -85,14 +85,12 @@ class MTraderAPI:
             self.sys_socket = context.socket(zmq.REQ)
             # set port timeout
             self.sys_socket.RCVTIMEO = sys_timeout * 1000
-            self.sys_socket.connect(
-                "tcp://{}:{}".format(self.HOST, self.SYS_PORT))
+            self.sys_socket.connect("tcp://{}:{}".format(self.HOST, self.SYS_PORT))
 
             self.data_socket = context.socket(zmq.PULL)
             # set port timeout
             self.data_socket.RCVTIMEO = data_timeout * 1000
-            self.data_socket.connect(
-                "tcp://{}:{}".format(self.HOST, self.DATA_PORT))
+            self.data_socket.connect("tcp://{}:{}".format(self.HOST, self.DATA_PORT))
 
             self.indicator_data_socket = context.socket(zmq.PULL)
             # set port timeout
@@ -167,6 +165,7 @@ class MTraderAPI:
 
     def _push_chart_data(self, data: dict) -> None:
         """Send message for chart control to server via ZeroMQ chart data socket"""
+
         try:
             if self.debug:
                 print("ZMQ PUSH CHART DATA: ", data, " -> ", data)
@@ -197,7 +196,7 @@ class MTraderAPI:
             "chartId": None,
             "indicatorChartId": None,
             "chartIndicatorSubWindow": None,
-            "style": None,
+            # "style": None,
         }
 
         # update dict values if exist
@@ -252,6 +251,8 @@ class MTraderAPI:
             "actionType": None,
             "chartId": None,
             "indicatorChartId": None,
+            "indicatorBufferId": None,
+            "style": None,
             "data": None,
         }
 
@@ -275,8 +276,7 @@ class MetaSingleton(MetaParams):
 
     def __call__(cls, *args, **kwargs):
         if cls._singleton is None:
-            cls._singleton = super(
-                MetaSingleton, cls).__call__(*args, **kwargs)
+            cls._singleton = super(MetaSingleton, cls).__call__(*args, **kwargs)
 
         return cls._singleton
 
@@ -605,8 +605,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
                 else:
                     self.cancel_order(oid, symbol)
             except Exception as e:
-                self.put_notification(
-                    "Order not cancelled: {}, {}".format(oid, e))
+                self.put_notification("Order not cancelled: {}, {}".format(oid, e))
                 continue
 
             self._cancel_flag = True
@@ -819,7 +818,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         return ret_val
 
     def chart_add_indicator(
-        self, chartId, indicatorChartId, chartIndicatorSubWindow, style
+        self, chartId, indicatorChartId, chartIndicatorSubWindow,  # style
     ):
         """Attaches the JsonAPIIndicator to the specified chart window"""
 
@@ -829,7 +828,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             chartId=chartId,
             indicatorChartId=indicatorChartId,
             chartIndicatorSubWindow=chartIndicatorSubWindow,
-            style=style,
+            # style=style,
         )
 
         if ret_val["error"]:
@@ -837,14 +836,27 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             raise ChartError(ret_val["description"])
             self.put_notification(ret_val["description"])
 
-    def push_chart_data(self, chartId, indicatorChartId, data):
+    def push_chart_data(self, chartId, indicatorChartId, indicatorBufferId, data):
         """Pushes backtrader indicator values to be distributed to be drawn by JsonAPIIndicator instances"""
 
         self.oapi.chart_data_construct_and_send(
             action="PLOT",
+            actionType="DATA",
             chartId=chartId,
             indicatorChartId=indicatorChartId,
+            indicatorBufferId=indicatorBufferId,
             data=data,
+        )
+
+    def chart_indicator_add_buffer(self, chartId, indicatorChartId, style):
+        """Add buffer to be drawn by JsonAPIIndicator instances"""
+
+        self.oapi.chart_data_construct_and_send(
+            action="PLOT",
+            actionType="ADDBUFFER",
+            chartId=chartId,
+            indicatorChartId=indicatorChartId,
+            style=style,
         )
 
     def chart_add_graphic(
