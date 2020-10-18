@@ -95,15 +95,11 @@ class MTraderAPI:
             self.indicator_data_socket = context.socket(zmq.PULL)
             # set port timeout
             self.indicator_data_socket.RCVTIMEO = data_timeout * 1000
-            self.indicator_data_socket.connect(
-                "tcp://{}:{}".format(self.HOST, self.INDICATOR_DATA_PORT)
-            )
+            self.indicator_data_socket.connect("tcp://{}:{}".format(self.HOST, self.INDICATOR_DATA_PORT))
             self.chart_data_socket = context.socket(zmq.PUSH)
             # set port timeout
             # TODO check if port is listening and error handling
-            self.chart_data_socket.connect(
-                "tcp://{}:{}".format(self.HOST, self.CHART_DATA_PORT)
-            )
+            self.chart_data_socket.connect("tcp://{}:{}".format(self.HOST, self.CHART_DATA_PORT))
 
         except zmq.ZMQError:
             raise zmq.ZMQBindError("Binding ports ERROR")
@@ -196,7 +192,7 @@ class MTraderAPI:
             "chartId": None,
             "indicatorChartId": None,
             "chartIndicatorSubWindow": None,
-            # "style": None,
+            "shortName": None,
         }
 
         # update dict values if exist
@@ -354,11 +350,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._orders_type = dict()  # keeps order types
 
         kwargs.update(
-            {
-                "host": self.params.host,
-                "debug": self.params.debug,
-                "datatimeout": self.params.datatimeout,
-            }
+            {"host": self.params.host, "debug": self.params.debug, "datatimeout": self.params.datatimeout,}
         )
         self.oapi = MTraderAPI(*args, **kwargs)
 
@@ -498,9 +490,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         side = "buy" if order.isbuy() else "sell"
         order_type = self._ORDEREXECS.get((order.exectype, side), None)
         if order_type is None:
-            raise ValueError(
-                "Wrong order type: %s or side: %s" % (order.exectype, side)
-            )
+            raise ValueError("Wrong order type: %s or side: %s" % (order.exectype, side))
 
         okwargs["actionType"] = order_type
         okwargs["symbol"] = order.data._dataname
@@ -611,9 +601,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self._cancel_flag = True
             self.broker._cancel(oref)
 
-    def price_data(
-        self, dataname, dtbegin, dtend, timeframe, compression, include_first=False
-    ):
+    def price_data(self, dataname, dtbegin, dtend, timeframe, compression, include_first=False):
         tf = self.get_granularity(timeframe, compression)
 
         begin = end = None
@@ -623,19 +611,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             end = int((dtend - self._DTEPOCH).total_seconds())
 
         if self.debug:
-            print(
-                "Fetching: {}, Timeframe: {}, Fromdate: {}".format(
-                    dataname, tf, dtbegin
-                )
-            )
+            print("Fetching: {}, Timeframe: {}, Fromdate: {}".format(dataname, tf, dtbegin))
 
         data = self.oapi.construct_and_send(
-            action="HISTORY",
-            actionType="DATA",
-            symbol=dataname,
-            chartTF=tf,
-            fromDate=begin,
-            toDate=end,
+            action="HISTORY", actionType="DATA", symbol=dataname, chartTF=tf, fromDate=begin, toDate=end,
         )
         price_data = data["data"]
         # Remove last unclosed candle
@@ -672,9 +651,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def config_server(self, symbol: str, timeframe: str, compression: int) -> None:
         """Set server terminal symbol and time frame"""
         ret_val = self.oapi.construct_and_send(
-            action="CONFIG",
-            symbol=symbol,
-            chartTF=self.get_granularity(timeframe, compression),
+            action="CONFIG", symbol=symbol, chartTF=self.get_granularity(timeframe, compression),
         )
 
         if ret_val["error"]:
@@ -697,9 +674,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if self.debug:
             print("Closing position: {}, on symbol: {}".format(oid, symbol))
 
-        conf = self.oapi.construct_and_send(
-            action="TRADE", actionType="POSITION_CLOSE_ID", symbol=symbol, id=oid
-        )
+        conf = self.oapi.construct_and_send(action="TRADE", actionType="POSITION_CLOSE_ID", symbol=symbol, id=oid)
         print(conf)
         # Error handling
         if conf["error"]:
@@ -709,9 +684,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if self.debug:
             print("Cancelling order: {}, on symbol: {}".format(oid, symbol))
 
-        conf = self.oapi.construct_and_send(
-            action="TRADE", actionType="ORDER_CANCEL", symbol=symbol, id=oid
-        )
+        conf = self.oapi.construct_and_send(action="TRADE", actionType="ORDER_CANCEL", symbol=symbol, id=oid)
         print(conf)
         # Error handling
         if conf["error"]:
@@ -803,11 +776,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             )
 
         ret_val = self.oapi.construct_and_send(
-            action="CHART",
-            actionType="OPEN",
-            chartId=chartId,
-            symbol=dataname,
-            chartTF=tf,
+            action="CHART", actionType="OPEN", chartId=chartId, symbol=dataname, chartTF=tf,
         )
 
         if ret_val["error"]:
@@ -817,9 +786,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
 
         return ret_val
 
-    def chart_add_indicator(
-        self, chartId, indicatorChartId, chartIndicatorSubWindow,  # style
-    ):
+    def chart_add_indicator(self, chartId, indicatorChartId, chartIndicatorSubWindow, shortName):
         """Attaches the JsonAPIIndicator to the specified chart window"""
 
         ret_val = self.oapi.construct_and_send(
@@ -828,7 +795,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             chartId=chartId,
             indicatorChartId=indicatorChartId,
             chartIndicatorSubWindow=chartIndicatorSubWindow,
-            # style=style,
+            shortName=shortName,
         )
 
         if ret_val["error"]:
@@ -852,16 +819,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         """Add buffer to be drawn by JsonAPIIndicator instances"""
 
         self.oapi.chart_data_construct_and_send(
-            action="PLOT",
-            actionType="ADDBUFFER",
-            chartId=chartId,
-            indicatorChartId=indicatorChartId,
-            style=style,
+            action="PLOT", actionType="ADDBUFFER", chartId=chartId, indicatorChartId=indicatorChartId, style=style,
         )
 
-    def chart_add_graphic(
-        self, chartId, indicatorChartId, chartIndicatorSubWindow, style
-    ):
+    def chart_add_graphic(self, chartId, indicatorChartId, chartIndicatorSubWindow, style):
         """Add graphical objects to a chart window"""
 
         ret_val = self.oapi.construct_and_send(
@@ -878,9 +839,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             raise ChartError(ret_val["description"])
             self.put_notification(ret_val["description"])
 
-    def config_indicator(
-        self, symbol, timeframe, compression, name, id, params, linecount
-    ):
+    def config_indicator(self, symbol, timeframe, compression, name, id, params, linecount):
         """Instantiates an indicator in MT5"""
 
         tf = self.get_granularity(timeframe, compression)
@@ -930,9 +889,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             raise IndicatorError(ret_val["description"])
             self.put_notification(ret_val["description"])
             if ret_val["lastError"] == "4806":
-                self.put_notification(
-                    "You have probably requested too many lines (MT5 indicator buffers)."
-                )
+                self.put_notification("You have probably requested too many lines (MT5 indicator buffers).")
 
         return ret_val
 
@@ -947,12 +904,7 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             self.put_notification(ret_val["description"])
 
     def write_csv(
-        self,
-        symbol: str,
-        timeframe: str,
-        compression: int = 1,
-        fromdate: datetime = None,
-        todate: datetime = None,
+        self, symbol: str, timeframe: str, compression: int = 1, fromdate: datetime = None, todate: datetime = None,
     ) -> None:
         """Request MT5 to write history data to CSV a file"""
 
@@ -978,19 +930,10 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         tf = self.get_granularity(timeframe, compression)
 
         if self.debug:
-            print(
-                "Request CSV write with Fetching: {}, Timeframe: {}, Fromdate: {}".format(
-                    symbol, tf, date_begin
-                )
-            )
+            print("Request CSV write with Fetching: {}, Timeframe: {}, Fromdate: {}".format(symbol, tf, date_begin))
 
         ret_val = self.oapi.construct_and_send(
-            action="HISTORY",
-            actionType="WRITE",
-            symbol=symbol,
-            chartTF=tf,
-            fromDate=begin,
-            toDate=end,
+            action="HISTORY", actionType="WRITE", symbol=symbol, chartTF=tf, fromDate=begin, toDate=end,
         )
 
         if ret_val["error"]:
