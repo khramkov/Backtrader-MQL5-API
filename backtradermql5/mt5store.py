@@ -815,8 +815,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             data=data,
         )
 
-    def chart_indicator_add_buffer(self, chartId, indicatorChartId, style):
-        """Add buffer to be drawn by JsonAPIIndicator instances"""
+    def chart_indicator_add_line(self, chartId, indicatorChartId, style):
+        """Add line to be drawn by JsonAPIIndicator instances"""
 
         self.oapi.chart_data_construct_and_send(
             action="PLOT", actionType="ADDBUFFER", chartId=chartId, indicatorChartId=indicatorChartId, style=style,

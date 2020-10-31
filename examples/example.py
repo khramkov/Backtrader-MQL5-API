@@ -3,7 +3,7 @@ import backtrader as bt
 import backtrader.indicators as btind
 from backtradermql5.mt5store import MTraderStore
 from backtradermql5.mt5indicator import getMTraderIndicator
-from backtradermql5.mt5chart import MTraderChart
+from backtradermql5.mt5chart import MTraderChart, ChartSubWindow
 from datetime import datetime, timedelta
 
 
@@ -12,41 +12,79 @@ class SmaCross(bt.SignalStrategy):
         self.buy_order = None
         self.live_data = False
 
-        # You can hookup backtrader to any indicator that runs in MT5
+        self.bbM15 = btind.BollingerBands(self.datas[0])
+        self.bbM30 = btind.BollingerBands(self.datas[1])
+
+        self.smaM15 = btind.MovingAverageSimple(self.datas[0].close)
+        self.smaM30 = btind.MovingAverageSimple(self.datas[1].close)
+
+        # Open a new chart window in MT5 with symbol and timeframe provided by the passed data stream object.
+        # Important: instantiate a new chart with class MTraderChart only after you attached any
+        # backtrader indicator you want to plot by calling getMTraderIndicator as shown on line 17 above. Otherwise it will fail!
+
+        # Plot the backtrader BollingerBand  and SMA indicator to a chart window with time frame 15 in MT5.
+
+        # Instantiate a new chart window
+        chartM15 = MTraderChart(self.datas[0])
+
+        # Instantiate new sub-window. Parameter idx=0 specifies the main window.
+        win0 = ChartSubWindow(idx=0, shortname="Bollinger Bands")
+
+        # Add a line buffer to the sub-window
+        win0.addline(
+            self.bbM15.top, style={"linelabel": "Top", "color": "clrBlue",},
+        )
+        win0.addline(
+            self.bbM15.mid, style={"linelabel": "Middle", "color": "clrYellow",},
+        )
+        win0.addline(
+            self.bbM15.bot, style={"linelabel": "Bottom", "color": "clrGreen",},
+        )
+        # Add sub-subwindow to chart and draw the line buffers.
+        chartM15.addsubwindow(win0)
+
+        # Instantiate second sub-window.
+        win1 = ChartSubWindow(idx=1, shortname="Simple Moving Average")
+        win1.addline(
+            self.smaM15.sma, style={"linelabel": "SMA", "color": "clrBlue", "linestyle": "STYLE_DASH", "linewidth": 2},
+        )
+        chartM15.addsubwindow(win1)
+
+        # Plot the backtrader BollingerBand  and SMA indicator to a chart window with time frame 30 in MT5.
+        chartM30 = MTraderChart(self.datas[1])
+        win0 = ChartSubWindow(idx=0, shortname="Bollinger Bands")
+        win0.addline(
+            self.bbM30.top, style={"linelabel": "Top", "color": "clrBlue",},
+        )
+        win0.addline(
+            self.bbM30.mid, style={"linelabel": "Middle", "color": "clrYellow",},
+        )
+        win0.addline(
+            self.bbM30.bot, style={"linelabel": "Bottom", "color": "clrGreen",},
+        )
+        chartM30.addsubwindow(win0)
+        win1 = ChartSubWindow(idx=1, shortname="Simple Moving Average")
+        win1.addline(
+            self.smaM30.sma, style={"linelabel": "SMA", "color": "clrBlue", "linestyle": "STYLE_DASH", "linewidth": 2},
+        )
+        chartM30.addsubwindow(win1)
+
         # Attach and retrieve values from the MT5 indicator "Examples/MACD"
-        self.mt5macd = getMTraderIndicator(
+        self.mt5cma = getMTraderIndicator(
             # MTraderStorestore instance
             store,
             # Data stream to run the indicator calculations on
             self.datas[0],
-            # Set accessor(s) for the indicator output buffers
-            ("macd", "signal",),
+            # Set accessor(s) for the indicator output lines
+            ("cma",),
             # MT5 inidicator name
-            indicator="Examples/MACD",
+            indicator="Examples/Custom Moving Average",
             # Indicator parameters.
             # Any omitted values will use the defaults as defind by the indicator
-            params=[12, 26, 9, "PRICE_CLOSE"],
+            params=[13, 0, "MODE_SMMA"],
+            # The parameter "params" must exit. If you want to use the indicator defaults, pass an empty list
+            # params=[],
         )()
-
-        # Attach any inidcator to be drawn to a chart window _before_ instantiating the MTraderChart class.
-        # self.sma = btind.SimpleMovingAverage(self.data)
-        self.bb = btind.BollingerBands(self.data)
-
-        # Open a new chart window in MT5 with symbol and timeframe provided by the passed data stream object.
-        # Important: instantiate a new chart with class MTraderChart only after you attached any
-        # indicator you want to plot by calling getMTraderIndicator as shown on line 17 above. Otherwise it will fail!
-        chart = MTraderChart(data_obj=self.datas[0])
-
-        # Plot the backtrader BollingerBand indicator to a chart window in MT5.
-        chart.addline(
-            self.bb.top, style={"shortname": "BT-BollingerBands", "linelabel": "Top", "color": "clrBlue",},
-        )
-        chart.addline(
-            self.bb.mid, style={"shortname": "BT-BollingerBands", "linelabel": "Middle", "color": "clrYellow",},
-        )
-        chart.addline(
-            self.bb.bot, style={"shortname": "BT-BollingerBands", "linelabel": "Bottom", "color": "clrGreen",},
-        )
 
     def next(self):
         if self.buy_order is None:
@@ -68,7 +106,7 @@ class SmaCross(bt.SignalStrategy):
             print(
                 f"{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]}"
             )
-            print(f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}")
+            print(f"MT5 indicator Examples/Custom Moving Average: {self.mt5cma.cma[0]}")  # " {self.mt5macd.macd[0]}")
 
     def notify_data(self, data, status, *args, **kwargs):
         dn = data._name
@@ -81,23 +119,32 @@ class SmaCross(bt.SignalStrategy):
             self.live_data = False
 
 
-host = "192.168.1.101"
-
 cerebro = bt.Cerebro()
-store = MTraderStore(host=host, debug=False, datatimeout=10)
+store = MTraderStore(host="192.168.56.124", debug=False, datatimeout=10)
 cerebro.addstrategy(SmaCross, store)
 
 # uncomment next 2 lines to use backbroker for live trading with MTraderStore
 # broker = store.getbroker(use_positions=True)
 # cerebro.setbroker(broker)
 
-start_date = datetime.now() - timedelta(minutes=200)
+start_date = datetime.now() - timedelta(days=5)
 
-data = store.getdata(
+data0 = store.getdata(
     dataname="EURUSD",
     timeframe=bt.TimeFrame.Minutes,
     fromdate=start_date,
-    compression=1,
+    compression=15,
+    # You need to provide the correct time zone for drawing indicators to charts widows in MT5 to work properly
+    tz=pytz.timezone("Europe/Berlin"),
+    # useask=True, # Ask price instead if the default bid price
+    # addspread=True, # Add the spread value
+    historical=True,
+)
+data1 = store.getdata(
+    dataname="EURUSD",
+    timeframe=bt.TimeFrame.Minutes,
+    fromdate=start_date,
+    compression=30,
     # You need to provide the correct time zone for drawing indicators to charts widows in MT5 to work properly
     tz=pytz.timezone("Europe/Berlin"),
     # useask=True, # Ask price instead if the default bid price
@@ -105,6 +152,7 @@ data = store.getdata(
     historical=True,
 )
 
-cerebro.adddata(data)
+cerebro.adddata(data0)
+cerebro.adddata(data1)
 
 cerebro.run(stdstats=False)
