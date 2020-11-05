@@ -7,6 +7,8 @@ class MTraderChart(bt.Indicator):
 
     # Inherited Indicator class requires at least one line
     lines = ("dummyline",)
+    plotlines = dict(dummyline=dict(_plotskip="True",))
+    plotinfo = dict(plotskip=True)
 
     def __init__(self):
         """
@@ -14,6 +16,7 @@ class MTraderChart(bt.Indicator):
         """
         self.windows = list()
         self.window_count = 0
+
         # TODO implent drawing of chart objects
         # graphic_types = ["curve", "line", "arrowbuy", "arrowsell"]
         self.p.chartId = str(uuid.uuid4())
