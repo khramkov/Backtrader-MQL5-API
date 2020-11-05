@@ -17,7 +17,7 @@ class MTraderChart(bt.Indicator):
         # TODO implent drawing of chart objects
         # graphic_types = ["curve", "line", "arrowbuy", "arrowsell"]
         self.p.chartId = str(uuid.uuid4())
-        self.p.symbol = self.data._name
+        self.p.symbol = self.data._dataname
         self.p.timeframe = self.data._timeframe
         self.p.compression = self.data._compression
         self.p.store = self.data.o
