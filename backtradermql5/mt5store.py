@@ -453,8 +453,8 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         while True:
             try:
                 last_data = socket.recv_json()
-                # if self.debug:
-                print("ZMQ LIVE DATA: ", last_data)
+                if self.debug:
+                    print("ZMQ LIVE DATA: ", last_data)
             except zmq.ZMQError:
                 raise zmq.NotDone("Live data ERROR")
 
