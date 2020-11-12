@@ -149,9 +149,9 @@ data2 = store.getdata(dataname='EURUSD',
 cerebro.run(stdstats=False)
 ```
 
-### Using MT5 Indicators and drawing to MT5 charts
+### Using MT5 Indicators and plotting to MT5 charts
 
-#### MT5 Inidcators
+#### MT5 Indicators
 
 You can use any MT5 indicator directly from Backtrader via the `MTraderIndicator` class.
 
@@ -160,7 +160,7 @@ You can use any MT5 indicator directly from Backtrader via the `MTraderIndicator
         self.mt5macd = getMTraderIndicator(
             # MTraderStorestore instance
             store,
-            # Data stream to run the indicator calculations on
+            # Data feed to run the indicator calculations on
             self.datas[0],
             # Set accessor(s) for the indicator output
             ("macd", "signal",),
@@ -175,21 +175,23 @@ You can use any MT5 indicator directly from Backtrader via the `MTraderIndicator
         print(f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}")
 ```
 
-For a fully working example of a Strategy refer to `example.py`.
+For a fully working and commented example of a Strategy refer to `example.py`.
 
-#### Drawing to charts
+#### Plotting indicators to MT5 charts
 
-You can open and draw directly to a chart in MT5 vial the `MTraderChart` class.
+You can open and draw directly to a chart in MT5 via the `MTraderChart` class.
 
 ```
     def __init__(self, store):
-        chart = MTraderChart(data_obj=self.datas[0])
         self.bb = btind.BollingerBands(self.data)
+        chart = MTraderChart(data_obj=self.datas[0])
+        indi0 = ChartIndicator(idx=0, shortname="Bollinger Bands")
         chart.addline(self.bb.top, style={
-                      "shortname": "BT-BollingerBands", "linelabel": "Top", "color": "clrBlue"})
+                    "linelabel": "Top", "color": "clrBlue"})
+        chart.addindicator(indi0)
 ```
 
-For a fully working example of a Strategy refer to `example.py`.
+For a fully working and commented example of a Strategy refer to `example.py`.
 
 ## License
 

@@ -75,6 +75,11 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         ("reconnect", True),
         ("useask", False),  # use the ask price instead of the default
         ("addspread", False),  # add spread difference to candle price data
+        # # Some brokers (looking at you, markets.com) deliver historical data and live/historical bar
+        # # data with a different spread than live ticks.
+        # # Setting "correct_tick_history = True" attempts to automatically correct historical tick data based on
+        # # the differenece in spread
+        # ("correct_tick_history", False),  # auto-correct historical price data
     )
 
     _store = mt5store.MTraderStore
@@ -131,7 +136,13 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         date_end = num2date(self.todate) if self.todate < float("inf") else None
 
         self.qhist = self.o.price_data(
-            self.p.dataname, date_begin, date_end, self.p.timeframe, self.p.compression, self.p.include_last,
+            self.p.dataname,
+            date_begin,
+            date_end,
+            self.p.timeframe,
+            self.p.compression,
+            self.p.include_last,
+            # self.p.correct_tick_history,
         )
 
         self._state = self._ST_HISTORBACK

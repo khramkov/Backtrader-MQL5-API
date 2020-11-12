@@ -2,6 +2,8 @@ from backtrader import bt
 import math
 import uuid
 
+# TODO self test. add lrma (or similar) to the chart, one dirctely in MT5 and teh other plotted form BT and compare
+
 
 class MTraderChart(bt.Indicator):
 
@@ -10,87 +12,106 @@ class MTraderChart(bt.Indicator):
     plotlines = dict(dummyline=dict(_plotskip="True",))
     plotinfo = dict(plotskip=True)
 
+    # If False, plot will be output on the next live tick/bar or immediatly after
+    # indicator calculations have finished when backtesting
+    params = dict(resampled=False, realtime=True, offset=False)
+
+    # Equates to constant EMPTY_VALUE in MQL5
+    str_inf = "1.797693134862316e+308"
+
     def __init__(self):
         """
         Opens a chart window in MT5 withe the smybol and timeframe of the passed data stream object.
         """
-        self.windows = list()
-        self.window_count = 0
+        self.indicators = list()
+        self.sub_window_count = 0
 
         # TODO implent drawing of chart objects
         # graphic_types = ["curve", "line", "arrowbuy", "arrowsell"]
-        self.p.chartId = str(uuid.uuid4())
+        self.p.chart_id = str(uuid.uuid4())
         self.p.symbol = self.data._dataname
         self.p.timeframe = self.data._timeframe
         self.p.compression = self.data._compression
-        self.p.store = self.data.o
 
-        self.p.store.config_chart(self.p.chartId, self.p.symbol, self.p.timeframe, self.p.compression)
+        # Assumimg the data feed is resampled if it was cloned. Set self.p.resampled to False if the feed was cloned, but not resampled
+        print(type(self.data).__name__)
+        if type(self.data).__name__ == "DataClone" and self.p.resampled or type(self.data).__name__ == "DataClone":
+            self.p.d = self.data.p.dataname
+            self.p.store = self.data.p.dataname.o
+        elif type(self.data).__name__ == "MTraderData":
+            self.p.d = self.data
+            self.p.store = self.data.o
+
+        res = self.p.store.config_chart(self.p.chart_id, self.p.symbol, self.p.timeframe, self.p.compression)
+        self.p.mt_chart_id = res["mtChartId"]
 
     def next(self):
-        state = self.data._state
-        qsize = self.data._historyback_queue_size
-        _ST_LIVE = self.data._ST_LIVE
+        state = self.p.d._state
+        qsize = self.p.d._historyback_queue_size
+        _ST_LIVE = self.p.d._ST_LIVE
 
-        for window in self.windows:
-            for line in window.line_store:
-                # # Support for repainting indicators
-                # # Wait for first indicator calculation
-                # mp = obj["line"]._minperiod
-                # if obj["line"].lencount > 0:
-
+        for indicator in self.indicators:
+            for line in indicator.line_store:
                 date = self.data.datetime.datetime()
                 value = line["line"][0]
                 if date != line["last_date"] and not math.isnan(value):
-                    line["values"].append(value)
-                    # Push historical indicator values when all historical price data has been processed
-                    if qsize <= 1 or state == _ST_LIVE:
-                        # # Support for repainting indicators
-                        # if obj["repaint"] is True and obj["line"].lencount >= mp:
-                        #     obj["values"] = obj["values"][: len(obj["values"]) - mp]
-                        #     for i in reversed(range(0, mp)):
-                        #         obj["values"].append(obj["line"][i * -1])
+                    line["values"].append(round(value, 6))
+                    line["from_date"] = date.timestamp()
+                    # non-realtime has problems with gaps. the plot will be offset to the left by the amount of gaps
+                    if qsize <= 1 or state == _ST_LIVE or self.p.realtime:
+                        if self.p.offset and line["last_date"]:
+                            line["from_date"] = line["last_date"].timestamp()
+                        if not self.p.realtime:
+                            line["values"].reverse()
+                        print(line["values"])
                         self.p.store.push_chart_data(
-                            self.p.chartId, window.windowId, line["bufferId"], line["values"],
+                            self.p.chart_id,
+                            self.p.mt_chart_id,
+                            indicator.id,
+                            line["buffer_id"],
+                            line["from_date"],
+                            line["values"],
                         )
                         line["values"] = []
+                        line["from_date"] = None
                     line["last_date"] = date
 
-    def addsubwindow(self, window):
+    def addchartindicator(self, indicator):
         """
-        Adds an indicator instance to a chart subwindow in MT5.
+        Adds an indicator instance to a chart (sub)window in MT5.
         """
-        if window.windowIdx > self.window_count:
-            self.window_count += 1
-            window.windowIdx = self.window_count
+        if indicator.sub_window_idx > self.sub_window_count:
+            self.sub_window_count += 1
+            indicator.sub_window_idx = self.sub_window_count
 
-        window.windowId = str(uuid.uuid4())
+        indicator.id = str(uuid.uuid4())
 
-        self.p.store.chart_add_indicator(self.p.chartId, window.windowId, window.windowIdx, window.shortname)
-        for line in window.line_store:
-            self.p.store.chart_indicator_add_line(self.p.chartId, window.windowId, line["style"])
-        self.windows.append(window)
+        self.p.store.chart_add_indicator(self.p.chart_id, indicator.id, indicator.sub_window_idx, indicator.shortname)
+        for line in indicator.line_store:
+            self.p.store.chart_indicator_add_line(self.p.chart_id, indicator.id, line["style"])
+        self.indicators.append(indicator)
 
 
-class ChartSubWindow:
+class ChartIndicator:
     """
-    Chart subwindow class
+    Chart indicator class
     """
 
     def __init__(self, idx, shortname):
-        self.windowIdx = idx
+        self.sub_window_idx = idx
         self.shortname = shortname
-        self.windowId = None
+        self.id = None
         self.indicator_line_count = -1
         self.line_store = []
 
     def addline(self, line, *args, **kwargs):
         style = {
             "linelabel": "Value",
-            "color": "clrBlue",
+            "color": "clrYellow",
             "linetype": "DRAW_LINE",
             "linestyle": "STYLE_SOLID",
             "linewidth": 1,
+            "blankforming": True,
         }
         style.update(**kwargs["style"])
 
@@ -98,11 +119,11 @@ class ChartSubWindow:
 
         self.line_store.append(
             {
-                "last_date": 0,
+                "last_date": None,
+                "from_date": None,
                 "line": line,
                 "style": style,
                 "values": [],
-                "bufferId": self.indicator_line_count
-                # "repaint": False,
+                "buffer_id": self.indicator_line_count,
             }
         )
