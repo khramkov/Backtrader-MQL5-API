@@ -91,37 +91,13 @@ class MTraderBroker(with_metaclass(MetaMTraderBroker, BrokerBase)):
             return
 
         if pos.size < 0:
-            order = SellOrder(
-                data=data,
-                size=pos.size,
-                price=pos.price,
-                exectype=Order.Market,
-                simulated=True,
-            )
+            order = SellOrder(data=data, size=pos.size, price=pos.price, exectype=Order.Market, simulated=True,)
         elif pos.size > 0:
-            order = BuyOrder(
-                data=data,
-                size=pos.size,
-                price=pos.price,
-                exectype=Order.Market,
-                simulated=True,
-            )
+            order = BuyOrder(data=data, size=pos.size, price=pos.price, exectype=Order.Market, simulated=True,)
 
         order.addcomminfo(self.getcommissioninfo(data))
         order.execute(
-            0,
-            pos.size,
-            pos.price,
-            0,
-            0.0,
-            0.0,
-            pos.size,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            pos.size,
-            pos.price,
+            0, pos.size, pos.price, 0, 0.0, 0.0, pos.size, 0.0, 0.0, 0.0, 0.0, pos.size, pos.price,
         )
 
         order.completed()
@@ -209,18 +185,12 @@ class MTraderBroker(with_metaclass(MetaMTraderBroker, BrokerBase)):
         pos.update(size, price)
 
         if size < 0:
-            order = SellOrder(
-                data=data, size=size, price=price, exectype=Order.Market, simulated=True
-            )
+            order = SellOrder(data=data, size=size, price=price, exectype=Order.Market, simulated=True)
         else:
-            order = BuyOrder(
-                data=data, size=size, price=price, exectype=Order.Market, simulated=True
-            )
+            order = BuyOrder(data=data, size=size, price=price, exectype=Order.Market, simulated=True)
 
         order.addcomminfo(self.getcommissioninfo(data))
-        order.execute(
-            0, size, price, 0, 0.0, 0.0, size, 0.0, 0.0, 0.0, 0.0, size, price
-        )
+        order.execute(0, size, price, 0, 0.0, 0.0, size, 0.0, 0.0, 0.0, 0.0, size, price)
 
         order.completed()
         self.notify(order)

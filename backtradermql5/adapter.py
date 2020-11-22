@@ -16,9 +16,7 @@ class Adapter(object):
         return super().__getattribute__(key)
 
     def __repr__(self):
-        return "{name}({raw})".format(
-            name=self.__class__.__name__, raw=pprint.pformat(self._raw, indent=4),
-        )
+        return "{name}({raw})".format(name=self.__class__.__name__, raw=pprint.pformat(self._raw, indent=4),)
 
 
 class BalanceAdapter(Adapter):

@@ -112,8 +112,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.o.start(data=self)
 
         # Add server script symbol and time frame
-        self.o.config_server(
-            self.p.dataname, self.p.timeframe, self.p.compression)
+        self.o.config_server(self.p.dataname, self.p.timeframe, self.p.compression)
 
         # Backfill from external data feed
         if self.p.backfill_from is not None:
@@ -128,18 +127,11 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     def _st_start(self):
         self.put_notification(self.DELAYED)
 
-        date_begin = num2date(
-            self.fromdate) if self.fromdate > float("-inf") else None
-        date_end = num2date(
-            self.todate) if self.todate < float("inf") else None
+        date_begin = num2date(self.fromdate) if self.fromdate > float("-inf") else None
+        date_end = num2date(self.todate) if self.todate < float("inf") else None
 
         self.qhist = self.o.price_data(
-            self.p.dataname,
-            date_begin,
-            date_end,
-            self.p.timeframe,
-            self.p.compression,
-            self.p.include_last,
+            self.p.dataname, date_begin, date_end, self.p.timeframe, self.p.compression, self.p.include_last,
         )
 
         self._state = self._ST_HISTORBACK
@@ -186,8 +178,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                         continue
 
                     if (
-                        msg["timeframe"]
-                        == self.o.get_granularity(self.p.timeframe, self.p.compression)
+                        msg["timeframe"] == self.o.get_granularity(self.p.timeframe, self.p.compression)
                         and msg["symbol"] == self.p.dataname
                     ):
                         if msg["timeframe"] == "TICK":
@@ -288,17 +279,10 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                 return round(sum([float(p), int(s) * 0.00001]), 5)
 
         self.lines.datetime[0] = dt
-        self.lines.open[0] = (
-            _open if not self.p.addspread else addspread(_open, _spread)
-        )
-        self.lines.high[0] = (
-            _high if not self.p.addspread else addspread(_high, _spread)
-        )
-        self.lines.low[0] = _low if not self.p.addspread else addspread(
-            _low, _spread)
-        self.lines.close[0] = (
-            _close if not self.p.addspread else addspread(_close, _spread)
-        )
+        self.lines.open[0] = _open if not self.p.addspread else addspread(_open, _spread)
+        self.lines.high[0] = _high if not self.p.addspread else addspread(_high, _spread)
+        self.lines.low[0] = _low if not self.p.addspread else addspread(_low, _spread)
+        self.lines.close[0] = _close if not self.p.addspread else addspread(_close, _spread)
         self.lines.volume[0] = _volume
         self.lines.openinterest[0] = 0.0
         return True

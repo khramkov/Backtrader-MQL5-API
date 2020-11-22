@@ -39,35 +39,18 @@ class SmaCross(bt.SignalStrategy):
 
         # Plot the backtrader BollingerBand indicator to a chart window in MT5.
         chart.addline(
-            self.bb.top,
-            style={
-                "shortname": "BT-BollingerBands",
-                "linelabel": "Top",
-                "color": "clrBlue",
-            },
+            self.bb.top, style={"shortname": "BT-BollingerBands", "linelabel": "Top", "color": "clrBlue",},
         )
         chart.addline(
-            self.bb.mid,
-            style={
-                "shortname": "BT-BollingerBands",
-                "linelabel": "Middle",
-                "color": "clrYellow",
-            },
+            self.bb.mid, style={"shortname": "BT-BollingerBands", "linelabel": "Middle", "color": "clrYellow",},
         )
         chart.addline(
-            self.bb.bot,
-            style={
-                "shortname": "BT-BollingerBands",
-                "linelabel": "Bottom",
-                "color": "clrGreen",
-            },
+            self.bb.bot, style={"shortname": "BT-BollingerBands", "linelabel": "Bottom", "color": "clrGreen",},
         )
 
     def next(self):
         if self.buy_order is None:
-            self.buy_order = self.buy_bracket(
-                limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market
-            )
+            self.buy_order = self.buy_bracket(limitprice=1.13, stopprice=1.10, size=0.1, exectype=bt.Order.Market)
 
         if self.live_data:
             cash = self.broker.getcash()
@@ -85,9 +68,7 @@ class SmaCross(bt.SignalStrategy):
             print(
                 f"{data.datetime.datetime()} - {data._name} | Cash {cash} | O: {data.open[0]} H: {data.high[0]} L: {data.low[0]} C: {data.close[0]} V:{data.volume[0]}"
             )
-            print(
-                f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}"
-            )
+            print(f"MT5 indicator Examples/MACD: {self.mt5macd.signal[0]} {self.mt5macd.macd[0]}")
 
     def notify_data(self, data, status, *args, **kwargs):
         dn = data._name

@@ -67,7 +67,14 @@ class MTraderChart(bt.Indicator):
         style.update(**kwargs["style"])
         chartIndicatorId = kwargs["indicator"]
         self.line_store.append(
-            {"last_date": 0, "line": line, "chartIndicatorId": chartIndicatorId, "style": style, "values": [], "bufferId": self.indicator_buffers[chartIndicatorId],}
+            {
+                "last_date": 0,
+                "line": line,
+                "chartIndicatorId": chartIndicatorId,
+                "style": style,
+                "values": [],
+                "bufferId": self.indicator_buffers[chartIndicatorId],
+            }
         )
         self.p.store.chart_indicator_add_buffer(self.p.chartId, chartIndicatorId, style)
         self.indicator_buffers[chartIndicatorId] += 1
