@@ -239,8 +239,9 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def _load_tick(self, msg):
         time_stamp, _bid, _ask = msg
-        # convert unix timestamp to float for millisecond resolution
-        d_time = datetime.utcfromtimestamp(float(time_stamp) / 1000.0)
+        # Keep timezone of the MetaTRader Tradeserver and convert to date object
+        # Convert unix timestamp to float for millisecond resolution
+        d_time = datetime.fromtimestamp(float(time_stamp) / 1000.0)
 
         dt = date2num(d_time)
 
@@ -264,7 +265,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def _load_candle(self, ohlcv):
         time_stamp, _open, _high, _low, _close, _volume, _spread = ohlcv
-        d_time = datetime.utcfromtimestamp(time_stamp)
+        # Keep timezone of the MetaTRader Tradeserver and convert to date object
+        d_time = datetime.fromtimestamp(time_stamp)
 
         dt = date2num(d_time)
 
