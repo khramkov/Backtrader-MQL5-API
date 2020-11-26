@@ -2,8 +2,10 @@ from backtrader import bt
 import uuid
 
 
-def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
+def getMTraderIndicator(mtstore, data_obj, lines=list(), plotinfo=dict(), plotlines=dict(), *args, **kwargs):
 
+    globals()["plotinfo"] = plotinfo
+    globals()["plotlines"] = plotlines
     globals()["lines"] = lines
     globals()["params"] = kwargs
 
@@ -15,6 +17,8 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
 
         lines = lines
         params = params
+        plotinfo = plotinfo
+        plotlines = plotlines
 
         def __init__(self):
             self.last_fromDate = 0
