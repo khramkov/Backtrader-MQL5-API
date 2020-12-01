@@ -4,6 +4,8 @@ import uuid
 
 def getMTraderIndicator(mtstore, data_obj, lines=list(), plotinfo=dict(), plotlines=dict(), *args, **kwargs):
 
+    if "plotname" not in plotinfo:
+        plotinfo["plotname"] = kwargs["indicator"]
     globals()["plotinfo"] = plotinfo
     globals()["plotlines"] = plotlines
     globals()["lines"] = lines
