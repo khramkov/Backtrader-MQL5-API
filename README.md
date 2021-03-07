@@ -179,15 +179,22 @@ For a fully working and commented example of a Strategy refer to `example.py`.
 
 #### Plotting indicators to MT5 charts
 
+This is an experimental feature and a work in progress! It WILL plot wrong data at this time.
+
 You can open and draw directly to a chart in MT5 via the `MTraderChart` class.
 
 ```
     def __init__(self, store):
         self.bb = btind.BollingerBands(self.data)
-        chart = MTraderChart(data_obj=self.datas[0])
+        chart = MTraderChart(self.datas[0], realtime=False)
         indi0 = ChartIndicator(idx=0, shortname="Bollinger Bands")
-        chart.addline(self.bb.top, style={
-                    "linelabel": "Top", "color": "clrBlue"})
+        indi0.addline(
+                bb.top,
+                style={
+                    "linelabel": "Top",
+                    "color": "clrBlue",
+                },
+        )
         chart.addindicator(indi0)
 ```
 
