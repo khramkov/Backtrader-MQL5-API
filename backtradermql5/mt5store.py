@@ -355,7 +355,11 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         self._orders_type = dict()  # keeps order types
 
         kwargs.update(
-            {"host": self.params.host, "debug": self.params.debug, "datatimeout": self.params.datatimeout,}
+            {
+                "host": self.params.host,
+                "debug": self.params.debug,
+                "datatimeout": self.params.datatimeout,
+            }
         )
         self.oapi = MTraderAPI(*args, **kwargs)
 
@@ -530,7 +534,12 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         okwargs["magic"] = order.ref
 
         okwargs.update(**kwargs)  # anything from the user
-        self.q_ordercreate.put((order.ref, okwargs,))
+        self.q_ordercreate.put(
+            (
+                order.ref,
+                okwargs,
+            )
+        )
 
         # notify orders of being submitted
         self.broker._submit(order.ref)
@@ -665,7 +674,9 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
     def config_server(self, symbol: str, timeframe: str, compression: int) -> None:
         """Set server terminal symbol and time frame"""
         ret_val = self.oapi.construct_and_send(
-            action="CONFIG", symbol=symbol, chartTF=self.get_granularity(timeframe, compression),
+            action="CONFIG",
+            symbol=symbol,
+            chartTF=self.get_granularity(timeframe, compression),
         )
 
         if ret_val["error"]:
@@ -699,7 +710,6 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             print("Cancelling order: {}, on symbol: {}".format(oid, symbol))
 
         conf = self.oapi.construct_and_send(action="TRADE", actionType="ORDER_CANCEL", symbol=symbol, id=oid)
-        print(conf)
         # Error handling
         if conf["error"]:
             raise ServerDataError(conf)
@@ -790,7 +800,11 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             )
 
         ret_val = self.oapi.construct_and_send(
-            action="CHART", actionType="OPEN", chartId=chartId, symbol=symbol, chartTF=chart_tf,
+            action="CHART",
+            actionType="OPEN",
+            chartId=chartId,
+            symbol=symbol,
+            chartTF=chart_tf,
         )
 
         if ret_val["error"]:
@@ -815,10 +829,16 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if ret_val["error"]:
             print(ret_val)
             raise ChartError(ret_val["description"])
-            self.put_notification(ret_val["description"])
+            # self.put_notification(ret_val["description"])
 
     def push_chart_data(
-        self, chart_id, mt_chart_id, chart_indicator_id, indicator_buffer_id, from_date, data,
+        self,
+        chart_id,
+        mt_chart_id,
+        chart_indicator_id,
+        indicator_buffer_id,
+        from_date,
+        data,
     ):
         """Pushes backtrader indicator values to be distributed to be drawn by JsonAPIIndicator instances"""
 
@@ -837,7 +857,11 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         """Add line to be drawn by JsonAPIIndicator instances"""
 
         self.oapi.chart_data_construct_and_send(
-            action="PLOT", actionType="ADDBUFFER", chartId=chart_id, chartIndicatorId=chart_indicator_id, style=style,
+            action="PLOT",
+            actionType="ADDBUFFER",
+            chartId=chart_id,
+            chartIndicatorId=chart_indicator_id,
+            style=style,
         )
 
     # def chart_add_graphic(self, chartId, chartIndicatorId, chartIndicatorSubWindow, style):
@@ -882,12 +906,14 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if ret_val["error"]:
             print(ret_val)
             raise IndicatorError(ret_val["description"])
-            self.put_notification(ret_val["description"])
+            # self.put_notification(ret_val["description"])
 
         return ret_val
 
     def indicator_data(
-        self, indicatorId, fromDate,
+        self,
+        indicatorId,
+        fromDate,
     ):
         """Recieves values from a MT5 indicator instance"""
 
@@ -899,15 +925,18 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             )
 
         ret_val = self.oapi.indicator_construct_and_send(
-            action="INDICATOR", actionType="REQUEST", id=indicatorId, fromDate=fromDate,
+            action="INDICATOR",
+            actionType="REQUEST",
+            id=indicatorId,
+            fromDate=fromDate,
         )
 
         if ret_val["error"]:
             print(ret_val)
             raise IndicatorError(ret_val["description"])
-            self.put_notification(ret_val["description"])
-            if ret_val["lastError"] == "4806":
-                self.put_notification("You have probably requested too many lines (MT5 indicator buffers).")
+            # self.put_notification(ret_val["description"])
+            # if ret_val["lastError"] == "4806":
+            #     self.put_notification("You have probably requested too many lines (MT5 indicator buffers).")
 
         return ret_val
 
@@ -919,10 +948,15 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
         if ret_val["error"]:
             print(ret_val)
             raise ServerConfigError(ret_val["description"])
-            self.put_notification(ret_val["description"])
+            # self.put_notification(ret_val["description"])
 
     def write_csv(
-        self, symbol: str, timeframe: str, compression: int = 1, fromdate: datetime = None, todate: datetime = None,
+        self,
+        symbol: str,
+        timeframe: str,
+        compression: int = 1,
+        fromdate: datetime = None,
+        todate: datetime = None,
     ) -> None:
         """Request MT5 to write history data to CSV a file"""
 
@@ -951,13 +985,18 @@ class MTraderStore(with_metaclass(MetaSingleton, object)):
             print("Request CSV write with Fetching: {}, Timeframe: {}, Fromdate: {}".format(symbol, tf, date_begin))
 
         ret_val = self.oapi.construct_and_send(
-            action="HISTORY", actionType="WRITE", symbol=symbol, chartTF=tf, fromDate=begin, toDate=end,
+            action="HISTORY",
+            actionType="WRITE",
+            symbol=symbol,
+            chartTF=tf,
+            fromDate=begin,
+            toDate=end,
         )
 
         if ret_val["error"]:
             print(ret_val)
             raise ServerConfigError(ret_val["description"])
-            self.put_notification(ret_val["description"])
+            # self.put_notification(ret_val["description"])
         else:
             self.put_notification(
                 f"Request to write CVS data for symbol {tf} and timeframe {tf} succeeded. Check MT5 EA logging for the exact output location ..."

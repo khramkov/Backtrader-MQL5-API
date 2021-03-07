@@ -2,14 +2,16 @@ from backtrader import bt
 import math
 import uuid
 
-# TODO self test. add lrma (or similar) to the chart, one dirctely in MT5 and teh other plotted form BT and compare
-
 
 class MTraderChart(bt.Indicator):
 
     # Inherited Indicator class requires at least one line
     lines = ("dummyline",)
-    plotlines = dict(dummyline=dict(_plotskip="True",))
+    plotlines = dict(
+        dummyline=dict(
+            _plotskip="True",
+        )
+    )
     plotinfo = dict(plotskip=True)
 
     # If False, plot will be output on the next live tick/bar or immediatly after
@@ -34,7 +36,6 @@ class MTraderChart(bt.Indicator):
         self.p.compression = self.data._compression
 
         # Assumimg the data feed is resampled if it was cloned. Set self.p.resampled to False if the feed was cloned, but not resampled
-        print(type(self.data).__name__)
         if type(self.data).__name__ == "DataClone" and self.p.resampled or type(self.data).__name__ == "DataClone":
             self.p.d = self.data.p.dataname
             self.p.store = self.data.p.dataname.o
@@ -63,7 +64,6 @@ class MTraderChart(bt.Indicator):
                             line["from_date"] = line["last_date"].timestamp()
                         if not self.p.realtime:
                             line["values"].reverse()
-                        print(line["values"])
                         self.p.store.push_chart_data(
                             self.p.chart_id,
                             self.p.mt_chart_id,
