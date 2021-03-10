@@ -1,3 +1,7 @@
+### March 6th
+- flag mt5chart module as "experimental"
+- redesign api for mt5chart module (see included exmaple)
+
 ### 30th April 2020
 
 - add support for spreads

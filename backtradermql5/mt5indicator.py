@@ -2,8 +2,12 @@ from backtrader import bt
 import uuid
 
 
-def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
+def getMTraderIndicator(mtstore, data_obj, lines=list(), plotinfo=dict(), plotlines=dict(), *args, **kwargs):
 
+    if "plotname" not in plotinfo:
+        plotinfo["plotname"] = kwargs["indicator"]
+    globals()["plotinfo"] = plotinfo
+    globals()["plotlines"] = plotlines
     globals()["lines"] = lines
     globals()["params"] = kwargs
 
@@ -15,13 +19,15 @@ def getMTraderIndicator(mtstore, data_obj, lines=list(), *args, **kwargs):
 
         lines = lines
         params = params
+        plotinfo = plotinfo
+        plotlines = plotlines
 
         def __init__(self):
             self.last_fromDate = 0
             self.p.timeframe = self.data_obj._timeframe
             self.p.compression = self.data_obj._compression
             self.p.id = str(uuid.uuid4())
-            self.p.symbol = self.data_obj._name
+            self.p.symbol = self.data_obj._dataname
             self.p.linecount = len(lines)
             self.p.params = [str(x) for x in self.p.params]
 

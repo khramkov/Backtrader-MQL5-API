@@ -75,6 +75,11 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         ("reconnect", True),
         ("useask", False),  # use the ask price instead of the default
         ("addspread", False),  # add spread difference to candle price data
+        # # Some brokers (looking at you, markets.com) deliver historical data and live/historical bar
+        # # data with a different spread than live ticks.
+        # # Setting "correct_tick_history = True" attempts to automatically correct historical tick data based on
+        # # the differenece in spread
+        # ("correct_tick_history", False),  # auto-correct historical price data
     )
 
     _store = mt5store.MTraderStore
@@ -112,8 +117,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
         self.o.start(data=self)
 
         # Add server script symbol and time frame
-        self.o.config_server(
-            self.p.dataname, self.p.timeframe, self.p.compression)
+        self.o.config_server(self.p.dataname, self.p.timeframe, self.p.compression)
 
         # Backfill from external data feed
         if self.p.backfill_from is not None:
@@ -128,10 +132,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
     def _st_start(self):
         self.put_notification(self.DELAYED)
 
-        date_begin = num2date(
-            self.fromdate) if self.fromdate > float("-inf") else None
-        date_end = num2date(
-            self.todate) if self.todate < float("inf") else None
+        date_begin = num2date(self.fromdate) if self.fromdate > float("-inf") else None
+        date_end = num2date(self.todate) if self.todate < float("inf") else None
 
         self.qhist = self.o.price_data(
             self.p.dataname,
@@ -140,6 +142,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
             self.p.timeframe,
             self.p.compression,
             self.p.include_last,
+            # self.p.correct_tick_history,
         )
 
         self._state = self._ST_HISTORBACK
@@ -186,8 +189,7 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                         continue
 
                     if (
-                        msg["timeframe"]
-                        == self.o.get_granularity(self.p.timeframe, self.p.compression)
+                        msg["timeframe"] == self.o.get_granularity(self.p.timeframe, self.p.compression)
                         and msg["symbol"] == self.p.dataname
                     ):
                         if msg["timeframe"] == "TICK":
@@ -248,8 +250,9 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def _load_tick(self, msg):
         time_stamp, _bid, _ask = msg
-        # convert unix timestamp to float for millisecond resolution
-        d_time = datetime.utcfromtimestamp(float(time_stamp) / 1000.0)
+        # Keep timezone of the MetaTRader Tradeserver and convert to date object
+        # Convert unix timestamp to float for millisecond resolution
+        d_time = datetime.fromtimestamp(float(time_stamp) / 1000.0)
 
         dt = date2num(d_time)
 
@@ -273,7 +276,8 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
 
     def _load_candle(self, ohlcv):
         time_stamp, _open, _high, _low, _close, _volume, _spread = ohlcv
-        d_time = datetime.utcfromtimestamp(time_stamp)
+        # Keep timezone of the MetaTRader Tradeserver and convert to date object
+        d_time = datetime.fromtimestamp(time_stamp)
 
         dt = date2num(d_time)
 
@@ -288,17 +292,10 @@ class MTraderData(with_metaclass(MetaMTraderData, DataBase)):
                 return round(sum([float(p), int(s) * 0.00001]), 5)
 
         self.lines.datetime[0] = dt
-        self.lines.open[0] = (
-            _open if not self.p.addspread else addspread(_open, _spread)
-        )
-        self.lines.high[0] = (
-            _high if not self.p.addspread else addspread(_high, _spread)
-        )
-        self.lines.low[0] = _low if not self.p.addspread else addspread(
-            _low, _spread)
-        self.lines.close[0] = (
-            _close if not self.p.addspread else addspread(_close, _spread)
-        )
+        self.lines.open[0] = _open if not self.p.addspread else addspread(_open, _spread)
+        self.lines.high[0] = _high if not self.p.addspread else addspread(_high, _spread)
+        self.lines.low[0] = _low if not self.p.addspread else addspread(_low, _spread)
+        self.lines.close[0] = _close if not self.p.addspread else addspread(_close, _spread)
         self.lines.volume[0] = _volume
         self.lines.openinterest[0] = 0.0
         return True
